@@ -12,9 +12,9 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: #f2f2f7; color: #1c1c1e; min-height: 100vh; }
-.app { max-width: 430px; margin: 0 auto; padding: 0 0 80px 0; }
-.tab-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 0.5px solid #c6c6c8; display: flex; z-index: 100; padding-bottom: env(safe-area-inset-bottom); }
-.tab { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 8px 0 4px; font-size: 10px; color: #8e8e93; cursor: pointer; gap: 3px; }
+.app { max-width: 430px; margin: 0 auto; padding: 0 0 60px 0; }
+.tab-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 0.5px solid #c6c6c8; display: flex; z-index: 100; padding-bottom: max(env(safe-area-inset-bottom), 8px); }
+.tab { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px 0 4px; font-size: 10px; color: #8e8e93; cursor: pointer; gap: 3px; }
 .tab.active { color: #1D9E75; }
 .tab svg { width: 24px; height: 24px; }
 .header { background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 16px 20px 12px; border-bottom: 0.5px solid #c6c6c8; position: sticky; top: 0; z-index: 50; }
@@ -240,10 +240,10 @@ function updateProgress() {
   const total = allHours();
   const remaining = Math.max(0, state.goal - total);
   const pct = Math.min(100, Math.round(total / state.goal * 100));
-  document.getElementById('total-display').textContent = total.toFixed(1)+' h';
+  document.getElementById('total-display').textContent = fmtHours(total);
   document.getElementById('goal-label').textContent = '目標 '+state.goal+' h';
   document.getElementById('progress-fill').style.width = pct+'%';
-  document.getElementById('progress-remain').textContent = '残り '+remaining.toFixed(1)+' h';
+  document.getElementById('progress-remain').textContent = '残り '+fmtHours(remaining);
 }
 function selectCat(cat) {
   state.category = cat;
@@ -279,6 +279,14 @@ function toggleTimer() {
     document.getElementById('deduct-card').style.display = 'block';
     renderDeductList();
   }
+}
+function fmtHours(h) {
+  const totalMin = Math.round(h * 60);
+  const hrs = Math.floor(totalMin / 60);
+  const min = totalMin % 60;
+  if (hrs === 0) return min + 'm';
+  if (min === 0) return hrs + 'h';
+  return hrs + 'h ' + min + 'm';
 }
 function fmtTime(d) {
   return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
@@ -368,7 +376,7 @@ function confirmSession() {
   document.getElementById('manual-start').value = '';
   document.getElementById('manual-end').value = '';
   updateProgress();
-  showToast(session.hours.toFixed(1)+' h を記録しました');
+  showToast(fmtHours(session.hours)+' を記録しました');
 }
 function renderLog() {
   const container = document.getElementById('log-list');
@@ -383,17 +391,17 @@ function renderLog() {
     div.innerHTML = '<div><div class="log-date-str">'+s.date+'</div>'+
       '<div class="log-time-str">'+s.start+' 〜 '+s.end+deductNote+'</div></div>'+
       '<div class="log-right"><div><span class="badge badge-'+(s.cat==='main'?'main':'other')+'">'+CAT_LABEL[s.cat]+'</span>'+manualBadge+'</div>'+
-      '<div class="log-hours">'+s.hours.toFixed(1)+'<span> h</span></div></div>';
+      '<div class="log-hours">'+fmtHours(s.hours)+'</div></div>';
     container.appendChild(div);
   });
 }
 function renderSummary() {
   const main = mainHours(), other = otherHours(), total = main + other;
   const remaining = Math.max(0, state.goal - total);
-  document.getElementById('sum-total').innerHTML = total.toFixed(1)+'<span class="summary-unit"> h</span>';
-  document.getElementById('sum-main').textContent = main.toFixed(1)+' h';
-  document.getElementById('sum-other').textContent = other.toFixed(1)+' h';
-  document.getElementById('sum-remain').textContent = '目標まで残り '+remaining.toFixed(1)+' h';
+  document.getElementById('sum-total').innerHTML = fmtHours(total);
+  document.getElementById('sum-main').textContent = fmtHours(main);
+  document.getElementById('sum-other').textContent = fmtHours(other);
+  document.getElementById('sum-remain').textContent = '目標まで残り '+fmtHours(remaining);
 }
 function saveGoal() {
   const val = parseFloat(document.getElementById('goal-input').value);
