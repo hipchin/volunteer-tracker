@@ -88,6 +88,8 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 .setting-input { width: 80px; font-size: 16px; padding: 6px 10px; border: 0.5px solid #c6c6c8; border-radius: 8px; text-align: right; color: #1c1c1e; background: #fff; }
 .setting-unit { font-size: 15px; color: #8e8e93; margin-left: 6px; }
 .setting-save { background: #1D9E75; color: #fff; border: none; border-radius: 8px; padding: 7px 16px; font-size: 15px; font-weight: 500; cursor: pointer; transition: transform 0.08s ease, filter 0.08s ease, opacity 0.08s ease; }
+.setting-desc { font-size: 12px; color: #8e8e93; margin-top: 3px; line-height: 1.35; max-width: 230px; }
+.setting-value { font-size: 15px; color: #8e8e93; }
 .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.75); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.25s; pointer-events: none; white-space: nowrap; z-index: 200; }
 .toast.show { opacity: 1; }
 .empty { padding: 32px 16px; text-align: center; font-size: 15px; color: #c7c7cc; }
@@ -233,6 +235,40 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
         </div>
       </div>
       <div style="font-size:13px;color:#8e8e93;padding:8px 4px">毎月この値がデフォルト目標として適用されます。</div>
+      <div class="section-header">バックアップ</div>
+      <div class="card">
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">バックアップを書き出す</div>
+            <div class="setting-desc">記録と目標時間をJSONファイルに保存します。</div>
+          </div>
+          <button class="setting-save" onclick="exportBackup()">書き出し</button>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">バックアップを読み込む</div>
+            <div class="setting-desc">機種変更時などにJSONファイルから復元します。</div>
+          </div>
+          <button class="setting-save" onclick="openImportBackup()">読み込み</button>
+        </div>
+      </div>
+      <div style="font-size:13px;color:#8e8e93;padding:8px 4px">復元前には現在のデータを端末内に自動退避します。</div>
+      <input type="file" id="backup-file-input" accept="application/json,.json" style="display:none" onchange="importBackupFile(event)">
+      <div class="section-header">アプリ情報</div>
+      <div class="card">
+        <div class="setting-row">
+          <span class="setting-label">現在のバージョン</span>
+          <span class="setting-value" id="app-version-label">-</span>
+        </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">最新版を読み込む</div>
+            <div class="setting-desc">GitHub Pages上の最新HTMLを再取得します。</div>
+          </div>
+          <button class="setting-save" onclick="reloadLatestApp()">更新</button>
+        </div>
+      </div>
+      <div style="font-size:13px;color:#8e8e93;padding:8px 4px">更新前にも現在のデータを端末内に自動退避します。</div>
     </div>
   </div>
 </div>
@@ -253,6 +289,8 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 <div class="toast" id="toast"></div>
 <script>
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
+const APP_VERSION = '2026.06.23.2';
+const BACKUP_SCHEMA_VERSION = 1;
 function makeSessionId() {
   return 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
 }
@@ -577,6 +615,132 @@ function deleteEditSession() {
   renderLog();
   showToast('記録を削除しました');
 }
+function buildBackupObject(reason = 'manual') {
+  return {
+    app: 'volunteer-tracker',
+    schemaVersion: BACKUP_SCHEMA_VERSION,
+    appVersion: APP_VERSION,
+    reason: reason,
+    exportedAt: new Date().toISOString(),
+    goal: state.goal,
+    sessions: state.sessions.map(s => ({ ...s }))
+  };
+}
+function backupFileName(prefix = 'volunteer-backup') {
+  const d = new Date();
+  const stamp = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + '_' +
+    String(d.getHours()).padStart(2,'0') + String(d.getMinutes()).padStart(2,'0');
+  return prefix + '-' + stamp + '.json';
+}
+function storeSafetyBackup(key, reason) {
+  try {
+    localStorage.setItem(key, JSON.stringify(buildBackupObject(reason)));
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+async function saveJsonFile(fileName, jsonText) {
+  const blob = new Blob([jsonText], { type: 'application/json' });
+  const file = new File([blob], fileName, { type: 'application/json' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+      await navigator.share({ files: [file], title: '奉仕記録バックアップ' });
+      return;
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 1000);
+}
+function exportBackup() {
+  const backup = buildBackupObject('manual-export');
+  const jsonText = JSON.stringify(backup, null, 2);
+  saveJsonFile(backupFileName(), jsonText);
+  showToast('バックアップを書き出しました');
+}
+function openImportBackup() {
+  const input = document.getElementById('backup-file-input');
+  if (!input) { showToast('読み込み欄が見つかりません'); return; }
+  input.value = '';
+  input.click();
+}
+function normalizeImportedSessions(rawSessions) {
+  if (!Array.isArray(rawSessions)) throw new Error('sessionsが配列ではありません');
+  return rawSessions.map(raw => {
+    const s = { ...raw };
+    if (!s.id) s.id = makeSessionId();
+    if (!s.dateKey && typeof s.date === 'string') s.dateKey = s.date.replace(/\//g, '-');
+    if (!s.dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(s.dateKey)) throw new Error('日付形式が正しくありません');
+    if (!s.month) s.month = dateToMonthKey(s.dateKey);
+    if (!s.date) s.date = s.dateKey.replace(/-/g, '/');
+    if (!s.cat || !CAT_LABEL[s.cat]) s.cat = 'main';
+    if (!s.start || !s.end || parseHM(s.start) === null || parseHM(s.end) === null) throw new Error('時刻形式が正しくありません');
+    if (!Number.isFinite(Number(s.deductMin))) s.deductMin = 0;
+    s.deductMin = Math.max(0, parseInt(s.deductMin, 10));
+    if (!Number.isFinite(Number(s.totalMin))) s.totalMin = sessionMinutes(s);
+    s.totalMin = Math.max(0, parseInt(s.totalMin, 10));
+    s.hours = s.totalMin / 60;
+    s.manual = Boolean(s.manual);
+    s.edited = Boolean(s.edited);
+    return s;
+  });
+}
+function importBackupFile(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(String(reader.result || ''));
+      if (!data || data.app !== 'volunteer-tracker') throw new Error('奉仕記録のバックアップではありません');
+      const sessions = normalizeImportedSessions(data.sessions);
+      const goal = parseFloat(data.goal);
+      const totalMin = sessions.reduce((sum, s) => sum + sessionMinutes(s), 0);
+      const dates = sessions.map(s => s.dateKey).sort();
+      const period = dates.length ? dates[0].replace(/-/g,'/') + '〜' + dates[dates.length - 1].replace(/-/g,'/') : '記録なし';
+      const msg = 'このバックアップを復元しますか？\n\n記録数：' + sessions.length + '件\n対象期間：' + period + '\n合計時間：' + fmtHours(totalMin / 60) + '\n\n現在の記録は上書きされます。';
+      if (!confirm(msg)) return;
+      storeSafetyBackup('vt_pre_restore_backup', 'before-restore');
+      state.sessions = sessions;
+      state.goal = Number.isFinite(goal) && goal > 0 ? goal : 30;
+      persistSessions();
+      localStorage.setItem('vt_goal', state.goal);
+      editingSessionId = null;
+      updateProgress();
+      renderSummary();
+      renderLog();
+      document.getElementById('goal-input').value = state.goal;
+      showToast('バックアップを復元しました');
+    } catch (e) {
+      showToast('バックアップを読み込めませんでした');
+      alert('バックアップを読み込めませんでした。\n' + (e && e.message ? e.message : 'ファイル形式を確認してください。'));
+    }
+  };
+  reader.onerror = () => showToast('ファイルの読み込みに失敗しました');
+  reader.readAsText(file);
+}
+function reloadLatestApp() {
+  const ok = confirm('最新版を読み込みますか？\n\n更新前に現在の記録を端末内へ自動退避します。');
+  if (!ok) return;
+  storeSafetyBackup('vt_pre_update_backup', 'before-update');
+  const baseUrl = location.origin + location.pathname;
+  location.href = baseUrl + '?v=' + Date.now();
+}
+function updateAppInfo() {
+  const label = document.getElementById('app-version-label');
+  if (label) label.textContent = APP_VERSION;
+}
+
 function renderSummary() {
   const main = mainHours(), other = otherHours(), total = main + other;
   const remaining = Math.max(0, state.goal - total);
@@ -602,7 +766,10 @@ function showTab(tab) {
   if (tab !== 'log') cancelEditSession();
   if (tab==='log') renderLog();
   if (tab==='summary') renderSummary();
-  if (tab==='settings') document.getElementById('goal-input').value = state.goal;
+  if (tab==='settings') {
+    document.getElementById('goal-input').value = state.goal;
+    updateAppInfo();
+  }
 }
 function softHaptic() {
   try {
@@ -639,6 +806,7 @@ function initPressFeedback() {
 initPressFeedback();
 updateHeader();
 updateProgress();
+updateAppInfo();
 </script>
 </body>
 </html>
