@@ -120,6 +120,21 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 .edit-delete { background: none; border: none; color: #ff3b30; font-size: 15px; padding: 12px 0 0; width: 100%; cursor: pointer; transition: transform 0.08s ease, opacity 0.08s ease; }
 .badge-edited { background: #e8f1ff; color: #1d4f91; margin-left: 4px; }
 
+.month-nav { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:16px 16px 0; }
+.month-nav-btn { width:44px; height:36px; border:none; border-radius:10px; background:#fff; color:#1D9E75; font-size:24px; line-height:1; cursor:pointer; transition:transform .08s ease, filter .08s ease, opacity .08s ease; }
+.month-nav-label { flex:1; text-align:center; font-size:17px; font-weight:600; color:#1c1c1e; }
+.fiscal-label { margin:10px 16px 0; font-size:13px; color:#8e8e93; text-align:center; }
+.lesson-input { width:86px; font-size:16px; padding:6px 10px; border:.5px solid #c6c6c8; border-radius:8px; text-align:right; color:#1c1c1e; background:#fff; }
+.report-card-title { padding:16px 16px 4px; font-size:18px; font-weight:700; }
+.report-card-sub { padding:0 16px 12px; font-size:13px; color:#8e8e93; line-height:1.45; white-space:pre-line; }
+.report-status { padding:12px 16px; font-size:13px; color:#8e8e93; border-top:.5px solid #f2f2f7; }
+.notice-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:450;padding:24px}
+.notice-overlay.show{display:flex;animation:goalFade .2s ease}
+.notice-card{background:#fff;border-radius:20px;padding:22px 20px;max-width:340px;width:100%;box-shadow:0 12px 30px rgba(0,0,0,.18)}
+.notice-title{font-size:21px;font-weight:700;margin-bottom:12px}
+.notice-msg{font-size:15px;line-height:1.65;color:#1c1c1e;margin-bottom:18px;white-space:pre-line}
+.notice-actions{display:flex;gap:8px}
+.notice-actions button{flex:1}
 
 .goal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:500;padding:24px}
 .goal-overlay.show{display:flex;animation:goalFade .25s ease}
@@ -191,7 +206,13 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
     </div>
   </div>
   <div id="view-log" style="display:none">
-    <div class="header"><div class="header-title">今月の履歴</div></div>
+    <div class="header"><div class="header-title" id="log-title">履歴</div></div>
+    <div class="month-nav">
+      <button class="month-nav-btn" onclick="changeSelectedMonth(-1)">‹</button>
+      <div class="month-nav-label" id="log-month-label">-</div>
+      <button class="month-nav-btn" onclick="changeSelectedMonth(1)">›</button>
+    </div>
+    <div class="fiscal-label" id="log-fiscal-label">-</div>
     <div class="card" style="margin:16px">
       <div id="log-list"><div class="empty">記録がまだありません</div></div>
     </div>
@@ -216,7 +237,13 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
     </div>
   </div>
   <div id="view-summary" style="display:none">
-    <div class="header"><div class="header-title">今月の集計</div></div>
+    <div class="header"><div class="header-title" id="summary-title">集計</div></div>
+    <div class="month-nav">
+      <button class="month-nav-btn" onclick="changeSelectedMonth(-1)">‹</button>
+      <div class="month-nav-label" id="summary-month-label">-</div>
+      <button class="month-nav-btn" onclick="changeSelectedMonth(1)">›</button>
+    </div>
+    <div class="fiscal-label" id="summary-fiscal-label">-</div>
     <div style="margin:16px">
       <div class="card">
         <div class="summary-big">
@@ -225,7 +252,14 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
         </div>
         <div class="summary-row"><span class="summary-row-label">野外奉仕</span><span class="summary-row-val" id="sum-main">0分</span></div>
         <div class="summary-row"><span class="summary-row-label">その他の奉仕</span><span class="summary-row-val" id="sum-other">0分</span></div>
+        <div class="summary-row"><span class="summary-row-label">レッスン</span><span class="summary-row-val"><input type="number" class="lesson-input" id="lesson-input" min="0" step="1" inputmode="numeric" onchange="saveLessonCount()"> 件</span></div>
         <div class="summary-remain" id="sum-remain">目標まで残り 30時間</div>
+      </div>
+      <div class="card">
+        <div class="report-card-title" id="report-title">奉仕報告</div>
+        <div class="report-card-sub" id="report-summary-text">月別の奉仕報告を確認できます。</div>
+        <div style="padding:0 16px 16px"><button class="btn-primary btn-green" id="report-done-btn" onclick="markReportDone()">報告済みにする</button></div>
+        <div class="report-status" id="report-status">未報告</div>
       </div>
     </div>
   </div>
@@ -296,6 +330,19 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
   </div>
 </nav>
 <div class="toast" id="toast"></div>
+<div class="notice-overlay" id="report-notice-overlay">
+  <div class="notice-card">
+    <div class="notice-title">📌 奉仕報告の確認</div>
+    <div class="notice-msg">先月分の奉仕報告がまだ完了していません。
+
+集計画面で内容を確認し、
+レッスン件数を入力してください。</div>
+    <div class="notice-actions">
+      <button class="btn-primary btn-green" onclick="openPendingReport()">集計を開く</button>
+      <button class="btn-primary btn-gray" onclick="snoozeReportNotice()">あとで</button>
+    </div>
+  </div>
+</div>
 <div class="goal-overlay" id="goal-overlay" onclick="hideGoalBanner()">
   <div class="goal-card">
     <div class="goal-title">🎉目標達成！</div>
@@ -305,7 +352,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 
 <script>
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.06.23.2';
+const APP_VERSION = '2026.06.24.1';
 const BACKUP_SCHEMA_VERSION = 1;
 function makeSessionId() {
   return 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
@@ -347,7 +394,11 @@ let state = {
   running: false, startTime: null, endTime: null, manualDate: null,
   category: 'main', isManual: false, timerInterval: null,
   sessions: loadSessions(),
-  goal: parseFloat(localStorage.getItem('vt_goal') || '30')
+  goal: parseFloat(localStorage.getItem('vt_goal') || '30'),
+  selectedMonth: getMonthKey(),
+  lessons: loadMap('vt_lessons'),
+  reported: loadMap('vt_reported_months'),
+  goalStatus: loadMap('vt_goal_status')
 };
 let editingSessionId = null;
 let editCat = 'main';
@@ -359,12 +410,72 @@ function getMonthKey() {
   const d = new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
 }
+function loadMap(key) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) || '{}');
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  } catch (e) {
+    return {};
+  }
+}
+function saveMap(key, value) {
+  localStorage.setItem(key, JSON.stringify(value || {}));
+}
 function dateToMonthKey(s) { return s.slice(0,7); }
-function thisMonthSessions() { return state.sessions.filter(s => s.month === getMonthKey()); }
+function parseMonthKey(monthKey) {
+  const [y, m] = String(monthKey).split('-').map(Number);
+  return { year: y, month: m };
+}
+function addMonths(monthKey, delta) {
+  const { year, month } = parseMonthKey(monthKey);
+  const d = new Date(year, month - 1 + delta, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function monthLabel(monthKey) {
+  const { year, month } = parseMonthKey(monthKey);
+  return year + '年' + month + '月';
+}
+function monthShortLabel(monthKey) {
+  return parseMonthKey(monthKey).month + '月';
+}
+function fiscalYearOf(monthKey) {
+  const { year, month } = parseMonthKey(monthKey);
+  return month >= 9 ? year : year - 1;
+}
+function fiscalLabel(monthKey) {
+  const fy = fiscalYearOf(monthKey);
+  return fy + '年度（' + fy + '年9月〜' + (fy + 1) + '年8月）';
+}
+function previousMonthKey() {
+  return addMonths(getMonthKey(), -1);
+}
+function sessionsForMonth(monthKey) {
+  return state.sessions.filter(s => s.month === monthKey);
+}
+function thisMonthSessions() { return sessionsForMonth(getMonthKey()); }
 function sumHours(arr) { return arr.reduce((a,s) => a + sessionMinutes(s), 0) / 60; }
-function mainHours() { return sumHours(thisMonthSessions().filter(s=>s.cat==='main')); }
-function otherHours() { return sumHours(thisMonthSessions().filter(s=>s.cat==='other')); }
-function allHours() { return mainHours() + otherHours(); }
+function mainHours(monthKey = getMonthKey()) { return sumHours(sessionsForMonth(monthKey).filter(s=>s.cat==='main')); }
+function otherHours(monthKey = getMonthKey()) { return sumHours(sessionsForMonth(monthKey).filter(s=>s.cat==='other')); }
+function allHours(monthKey = getMonthKey()) { return mainHours(monthKey) + otherHours(monthKey); }
+function getLessonCount(monthKey) {
+  const n = parseInt(state.lessons[monthKey] || '0', 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+function setLessonCount(monthKey, count) {
+  state.lessons[monthKey] = Math.max(0, parseInt(count || '0', 10) || 0);
+  saveMap('vt_lessons', state.lessons);
+}
+function isReported(monthKey) {
+  return state.reported[monthKey] === true;
+}
+function setReported(monthKey, value) {
+  if (value) state.reported[monthKey] = true;
+  else delete state.reported[monthKey];
+  saveMap('vt_reported_months', state.reported);
+}
+function selectedMonthSessions() {
+  return sessionsForMonth(state.selectedMonth);
+}
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
@@ -527,7 +638,8 @@ function confirmSession() {
 }
 function renderLog() {
   const container = document.getElementById('log-list');
-  const sessions = thisMonthSessions().slice().sort((a,b) => {
+  updateMonthLabels();
+  const sessions = selectedMonthSessions().slice().sort((a,b) => {
     if (a.dateKey !== b.dateKey) return b.dateKey > a.dateKey ? 1 : -1;
     if (a.start !== b.start) return b.start > a.start ? 1 : -1;
     return String(b.id).localeCompare(String(a.id));
@@ -629,6 +741,7 @@ function deleteEditSession() {
   persistSessions();
   updateProgress();
   renderSummary();
+  checkGoalAchievement();
   cancelEditSession();
   renderLog();
   showToast('記録を削除しました');
@@ -641,6 +754,9 @@ function buildBackupObject(reason = 'manual') {
     reason: reason,
     exportedAt: new Date().toISOString(),
     goal: state.goal,
+    lessons: { ...state.lessons },
+    reported: { ...state.reported },
+    goalStatus: { ...state.goalStatus },
     sessions: state.sessions.map(s => ({ ...s }))
   };
 }
@@ -731,8 +847,14 @@ function importBackupFile(event) {
       storeSafetyBackup('vt_pre_restore_backup', 'before-restore');
       state.sessions = sessions;
       state.goal = Number.isFinite(goal) && goal > 0 ? goal : 30;
+      state.lessons = data.lessons && typeof data.lessons === 'object' && !Array.isArray(data.lessons) ? data.lessons : {};
+      state.reported = data.reported && typeof data.reported === 'object' && !Array.isArray(data.reported) ? data.reported : {};
+      state.goalStatus = data.goalStatus && typeof data.goalStatus === 'object' && !Array.isArray(data.goalStatus) ? data.goalStatus : {};
       persistSessions();
       localStorage.setItem('vt_goal', state.goal);
+      saveMap('vt_lessons', state.lessons);
+      saveMap('vt_reported_months', state.reported);
+      saveMap('vt_goal_status', state.goalStatus);
       editingSessionId = null;
       updateProgress();
       renderSummary();
@@ -759,14 +881,109 @@ function updateAppInfo() {
   if (label) label.textContent = APP_VERSION;
 }
 
+function updateMonthLabels() {
+  const label = monthLabel(state.selectedMonth);
+  const fiscal = fiscalLabel(state.selectedMonth);
+  const logTitle = document.getElementById('log-title');
+  const summaryTitle = document.getElementById('summary-title');
+  const logMonth = document.getElementById('log-month-label');
+  const summaryMonth = document.getElementById('summary-month-label');
+  const logFiscal = document.getElementById('log-fiscal-label');
+  const summaryFiscal = document.getElementById('summary-fiscal-label');
+  if (logTitle) logTitle.textContent = label + 'の履歴';
+  if (summaryTitle) summaryTitle.textContent = label + 'の集計';
+  if (logMonth) logMonth.textContent = '＜ ' + label + ' ＞';
+  if (summaryMonth) summaryMonth.textContent = '＜ ' + label + ' ＞';
+  if (logFiscal) logFiscal.textContent = fiscal;
+  if (summaryFiscal) summaryFiscal.textContent = fiscal;
+}
+function changeSelectedMonth(delta) {
+  state.selectedMonth = addMonths(state.selectedMonth, delta);
+  cancelEditSession();
+  renderLog();
+  renderSummary();
+}
+function saveLessonCount() {
+  const input = document.getElementById('lesson-input');
+  if (!input) return;
+  const val = parseInt(input.value || '0', 10);
+  setLessonCount(state.selectedMonth, val);
+  renderSummary();
+  showToast('レッスン件数を保存しました');
+}
+function reportTextForMonth(monthKey) {
+  const main = mainHours(monthKey);
+  const other = otherHours(monthKey);
+  const lessons = getLessonCount(monthKey);
+  return monthShortLabel(monthKey) + '奉仕報告\n\n野外奉仕 ' + fmtHours(main) + '\nその他の奉仕 ' + fmtHours(other) + '\nレッスン ' + lessons + '件';
+}
 function renderSummary() {
-  const main = mainHours(), other = otherHours(), total = main + other;
+  updateMonthLabels();
+  const main = mainHours(state.selectedMonth), other = otherHours(state.selectedMonth), total = main + other;
   const remaining = Math.max(0, state.goal - total);
   document.getElementById('sum-total').innerHTML = fmtHours(total);
   document.getElementById('sum-main').textContent = fmtHours(main);
   document.getElementById('sum-other').textContent = fmtHours(other);
   document.getElementById('sum-remain').textContent = '目標まで残り '+fmtHours(remaining);
+  const lessonInput = document.getElementById('lesson-input');
+  if (lessonInput) lessonInput.value = getLessonCount(state.selectedMonth);
+  const reportTitle = document.getElementById('report-title');
+  const reportSummaryText = document.getElementById('report-summary-text');
+  const reportStatus = document.getElementById('report-status');
+  const reportDoneBtn = document.getElementById('report-done-btn');
+  if (reportTitle) reportTitle.textContent = monthShortLabel(state.selectedMonth) + '奉仕報告';
+  if (reportSummaryText) reportSummaryText.textContent = reportTextForMonth(state.selectedMonth);
+  if (reportStatus) reportStatus.textContent = isReported(state.selectedMonth) ? '報告済み' : '未報告';
+  if (reportDoneBtn) {
+    reportDoneBtn.style.display = isReported(state.selectedMonth) ? 'none' : 'block';
+  }
 }
+function markReportDone() {
+  setReported(state.selectedMonth, true);
+  renderSummary();
+  showToast(monthLabel(state.selectedMonth) + 'を報告済みにしました');
+}
+function pendingReportMonth() {
+  const prev = previousMonthKey();
+  return isReported(prev) ? null : prev;
+}
+function reportNoticeSnoozeKey(monthKey) {
+  return 'vt_report_notice_snoozed_' + monthKey;
+}
+function shouldShowReportNotice() {
+  const monthKey = pendingReportMonth();
+  if (!monthKey) return null;
+  const snoozed = localStorage.getItem(reportNoticeSnoozeKey(monthKey));
+  if (snoozed === todayStr()) return null;
+  return monthKey;
+}
+function showReportNoticeIfNeeded() {
+  const monthKey = shouldShowReportNotice();
+  if (!monthKey) return;
+  const el = document.getElementById('report-notice-overlay');
+  if (el) {
+    el.dataset.month = monthKey;
+    el.classList.add('show');
+  }
+}
+function hideReportNotice() {
+  const el = document.getElementById('report-notice-overlay');
+  if (el) el.classList.remove('show');
+}
+function openPendingReport() {
+  const el = document.getElementById('report-notice-overlay');
+  const monthKey = (el && el.dataset.month) || pendingReportMonth() || previousMonthKey();
+  hideReportNotice();
+  state.selectedMonth = monthKey;
+  showTab('summary');
+}
+function snoozeReportNotice() {
+  const el = document.getElementById('report-notice-overlay');
+  const monthKey = (el && el.dataset.month) || pendingReportMonth();
+  if (monthKey) localStorage.setItem(reportNoticeSnoozeKey(monthKey), todayStr());
+  hideReportNotice();
+}
+
 function saveGoal() {
   const val = parseFloat(document.getElementById('goal-input').value);
   if (!isNaN(val) && val > 0) {
@@ -823,12 +1040,26 @@ function initPressFeedback() {
   document.addEventListener('visibilitychange', () => clearPress(0));
 }
 
-function checkGoalAchievement(){
-  const monthKey=getMonthKey();
-  const flag='vt_goal_achieved_'+monthKey;
-  if(allHours()>=state.goal && localStorage.getItem(flag)!=='true'){
-    localStorage.setItem(flag,'true');
-    showGoalBanner();
+function checkGoalAchievement(monthKey = getMonthKey()){
+  const total = allHours(monthKey);
+  const achieved = total >= state.goal;
+  const hasModernStatus = Object.prototype.hasOwnProperty.call(state.goalStatus, monthKey);
+  const legacyAchieved = localStorage.getItem('vt_goal_achieved_' + monthKey) === 'true';
+  const wasAchieved = state.goalStatus[monthKey] === true || (!hasModernStatus && legacyAchieved);
+  if (achieved && !wasAchieved) {
+    state.goalStatus[monthKey] = true;
+    saveMap('vt_goal_status', state.goalStatus);
+    if (monthKey === getMonthKey()) showGoalBanner();
+    return;
+  }
+  if (!achieved && wasAchieved) {
+    state.goalStatus[monthKey] = false;
+    saveMap('vt_goal_status', state.goalStatus);
+    return;
+  }
+  if (achieved && !hasModernStatus && legacyAchieved) {
+    state.goalStatus[monthKey] = true;
+    saveMap('vt_goal_status', state.goalStatus);
   }
 }
 function showGoalBanner(){
@@ -844,6 +1075,9 @@ initPressFeedback();
 updateHeader();
 updateProgress();
 updateAppInfo();
+updateMonthLabels();
+checkGoalAchievement();
+setTimeout(showReportNoticeIfNeeded, 250);
 </script>
 </body>
 </html>
