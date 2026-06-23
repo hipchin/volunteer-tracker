@@ -12,9 +12,10 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif; background: #f2f2f7; color: #1c1c1e; min-height: 100vh; }
-.app { max-width: 430px; margin: 0 auto; padding: 0 0 60px 0; }
+button, .tab { -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+.app { max-width: 430px; margin: 0 auto; padding: 0 0 calc(74px + env(safe-area-inset-bottom)) 0; }
 .tab-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-top: 0.5px solid #c6c6c8; display: flex; z-index: 100; padding-bottom: max(env(safe-area-inset-bottom), 8px); }
-.tab { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px 0 4px; font-size: 10px; color: #8e8e93; cursor: pointer; gap: 3px; }
+.tab { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 10px 0 4px; font-size: 10px; color: #8e8e93; cursor: pointer; gap: 3px; transition: transform 0.08s ease, opacity 0.08s ease; }
 .tab.active { color: #1D9E75; }
 .tab svg { width: 24px; height: 24px; }
 .header { background: rgba(255,255,255,0.92); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); padding: 16px 20px 12px; border-bottom: 0.5px solid #c6c6c8; position: sticky; top: 0; z-index: 50; }
@@ -30,20 +31,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .progress-fill { height: 100%; background: #1D9E75; border-radius: 3px; transition: width 0.4s ease; }
 .progress-remain { font-size: 13px; color: #8e8e93; margin-top: 6px; }
 .cat-row { display: flex; gap: 8px; padding: 0 16px 16px; }
-.cat-btn { flex: 1; padding: 10px 8px; border-radius: 10px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; background: #f2f2f7; color: #8e8e93; }
+.cat-btn { flex: 1; padding: 10px 8px; border-radius: 10px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; transition: transform 0.08s ease, filter 0.08s ease, opacity 0.08s ease, background-color 0.12s ease; background: #f2f2f7; color: #8e8e93; }
 .cat-btn.active { background: #1D9E75; color: #fff; }
 .timer-area { padding: 8px 16px 16px; text-align: center; }
 .timer-label { font-size: 13px; color: #8e8e93; margin-bottom: 4px; min-height: 18px; }
 .timer-display { font-size: 48px; font-weight: 200; letter-spacing: 2px; color: #1c1c1e; margin-bottom: 16px; font-variant-numeric: tabular-nums; }
 .timer-display.running { color: #1D9E75; }
-.btn-primary { width: 100%; padding: 14px; border-radius: 12px; border: none; font-size: 17px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.btn-primary { width: 100%; padding: 14px; border-radius: 12px; border: none; font-size: 17px; font-weight: 600; cursor: pointer; transition: transform 0.08s ease, filter 0.08s ease, opacity 0.08s ease, background-color 0.12s ease; }
 .btn-green { background: #1D9E75; color: #fff; }
 .btn-green:active { background: #158a63; }
 .btn-red { background: #ff3b30; color: #fff; }
 .btn-red:active { background: #d93025; }
 .btn-gray { background: #f2f2f7; color: #1c1c1e; }
 .btn-gray:active { background: #e5e5ea; }
-.btn-link { background: none; border: none; font-size: 15px; color: #1D9E75; cursor: pointer; padding: 10px 0; display: block; width: 100%; text-align: center; }
+.btn-link { background: none; border: none; font-size: 15px; color: #1D9E75; cursor: pointer; padding: 10px 0; display: block; width: 100%; text-align: center; transition: transform 0.08s ease, opacity 0.08s ease; }
 .btn-link.muted { color: #8e8e93; }
 .divider { display: flex; align-items: center; gap: 10px; padding: 4px 0 8px; }
 .divider-line { flex: 1; height: 0.5px; background: #e5e5ea; }
@@ -59,8 +60,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .deduct-row input { flex: 1; font-size: 15px; padding: 8px 10px; border: 0.5px solid #c6c6c8; border-radius: 10px; background: #fff; color: #1c1c1e; -webkit-appearance: none; }
 .deduct-row input:focus { outline: none; border-color: #1D9E75; }
 .deduct-sep { font-size: 13px; color: #c7c7cc; }
-.deduct-del { width: 28px; height: 28px; border-radius: 50%; background: #ff3b30; border: none; color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.btn-add-deduct { background: none; border: none; font-size: 15px; color: #1D9E75; cursor: pointer; padding: 6px 0 12px; display: block; }
+.deduct-del { width: 28px; height: 28px; border-radius: 50%; background: #ff3b30; border: none; color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.08s ease, filter 0.08s ease, opacity 0.08s ease; }
+.btn-add-deduct { background: none; border: none; font-size: 15px; color: #1D9E75; cursor: pointer; padding: 6px 0 12px; display: block; transition: transform 0.08s ease, opacity 0.08s ease; }
 .log-item { padding: 12px 16px; border-bottom: 0.5px solid #f2f2f7; display: flex; align-items: center; justify-content: space-between; }
 .log-item:last-child { border-bottom: none; }
 .log-date-str { font-size: 15px; font-weight: 500; }
@@ -86,11 +87,37 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 .setting-label { font-size: 16px; }
 .setting-input { width: 80px; font-size: 16px; padding: 6px 10px; border: 0.5px solid #c6c6c8; border-radius: 8px; text-align: right; color: #1c1c1e; background: #fff; }
 .setting-unit { font-size: 15px; color: #8e8e93; margin-left: 6px; }
-.setting-save { background: #1D9E75; color: #fff; border: none; border-radius: 8px; padding: 7px 16px; font-size: 15px; font-weight: 500; cursor: pointer; }
+.setting-save { background: #1D9E75; color: #fff; border: none; border-radius: 8px; padding: 7px 16px; font-size: 15px; font-weight: 500; cursor: pointer; transition: transform 0.08s ease, filter 0.08s ease, opacity 0.08s ease; }
 .toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.75); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: opacity 0.25s; pointer-events: none; white-space: nowrap; z-index: 200; }
 .toast.show { opacity: 1; }
 .empty { padding: 32px 16px; text-align: center; font-size: 15px; color: #c7c7cc; }
 .section-header { font-size: 13px; color: #8e8e93; padding: 16px 16px 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.is-pressing { transform: scale(0.97); filter: brightness(0.94); opacity: 0.82; }
+.btn-primary.is-pressing { transform: scale(0.985); filter: brightness(0.9); opacity: 1; }
+.tab.is-pressing { transform: translateY(1px) scale(0.96); filter: none; opacity: 0.65; }
+.btn-link.is-pressing, .btn-add-deduct.is-pressing { transform: scale(0.98); filter: none; opacity: 0.55; }
+
+.log-left { min-width: 0; padding-right: 10px; }
+.log-actions { margin-top: 8px; }
+.log-edit-btn { border: none; background: #f2f2f7; color: #1D9E75; border-radius: 8px; padding: 6px 10px; font-size: 13px; font-weight: 500; cursor: pointer; transition: transform 0.08s ease, filter 0.08s ease, opacity 0.08s ease, background-color 0.12s ease; }
+.log-edit-btn:active { background: #e5e5ea; }
+.log-item.editing { background: #f3fbf8; }
+.edit-card { overflow: visible; }
+.edit-title { padding: 16px 16px 4px; font-size: 17px; font-weight: 600; }
+.edit-sub { padding: 0 16px 12px; font-size: 13px; color: #8e8e93; }
+.edit-area { padding: 0 16px 16px; }
+.edit-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.edit-row label { font-size: 15px; color: #8e8e93; width: 70px; flex-shrink: 0; }
+.edit-row input { flex: 1; font-size: 16px; padding: 10px 12px; border: 0.5px solid #c6c6c8; border-radius: 10px; background: #fff; color: #1c1c1e; -webkit-appearance: none; }
+.edit-row input:focus { outline: none; border-color: #1D9E75; }
+.edit-cat-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.edit-cat-btn { flex: 1; padding: 10px 8px; border-radius: 10px; border: none; font-size: 14px; font-weight: 500; cursor: pointer; transition: transform 0.08s ease, filter 0.08s ease, opacity 0.08s ease, background-color 0.12s ease; background: #f2f2f7; color: #8e8e93; }
+.edit-cat-btn.active { background: #1D9E75; color: #fff; }
+.edit-actions { display: flex; gap: 8px; margin-top: 4px; }
+.edit-actions .btn-primary { flex: 1; }
+.edit-delete { background: none; border: none; color: #ff3b30; font-size: 15px; padding: 12px 0 0; width: 100%; cursor: pointer; transition: transform 0.08s ease, opacity 0.08s ease; }
+.badge-edited { background: #e8f1ff; color: #1d4f91; margin-left: 4px; }
+
 </style>
 </head>
 <body>
@@ -157,6 +184,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
     <div class="card" style="margin:16px">
       <div id="log-list"><div class="empty">記録がまだありません</div></div>
     </div>
+    <div class="card edit-card" id="edit-card" style="display:none;margin:16px">
+      <div class="edit-title">記録を編集</div>
+      <div class="edit-sub" id="edit-sub">選択した記録を修正します</div>
+      <div class="edit-area">
+        <div class="edit-cat-row">
+          <button class="edit-cat-btn active" id="edit-cat-main" onclick="selectEditCat('main')">野外奉仕</button>
+          <button class="edit-cat-btn" id="edit-cat-other" onclick="selectEditCat('other')">その他の奉仕</button>
+        </div>
+        <div class="edit-row"><label>日付</label><input type="date" id="edit-date"></div>
+        <div class="edit-row"><label>開始</label><input type="time" id="edit-start"></div>
+        <div class="edit-row"><label>終了</label><input type="time" id="edit-end"></div>
+        <div class="edit-row"><label>中断</label><input type="number" id="edit-deduct" min="0" step="1" inputmode="numeric"><span class="setting-unit">分</span></div>
+        <div class="edit-actions">
+          <button class="btn-primary btn-green" onclick="saveEditSession()">保存</button>
+          <button class="btn-primary btn-gray" onclick="cancelEditSession()">キャンセル</button>
+        </div>
+        <button class="edit-delete" onclick="deleteEditSession()">この記録を削除する</button>
+      </div>
+    </div>
   </div>
   <div id="view-summary" style="display:none">
     <div class="header"><div class="header-title">今月の集計</div></div>
@@ -207,12 +253,50 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-se
 <div class="toast" id="toast"></div>
 <script>
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
+function makeSessionId() {
+  return 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+function sessionMinutes(s) {
+  if (Number.isFinite(Number(s.totalMin))) return Number(s.totalMin);
+  return Math.round((Number(s.hours) || 0) * 60);
+}
+function loadSessions() {
+  let sessions = [];
+  try {
+    const saved = JSON.parse(localStorage.getItem('vt_sessions') || '[]');
+    if (Array.isArray(saved)) sessions = saved;
+  } catch (e) {
+    sessions = [];
+  }
+  let changed = false;
+  sessions = sessions.map(s => {
+    const copy = { ...s };
+    if (!copy.id) { copy.id = makeSessionId(); changed = true; }
+    if (!Number.isFinite(Number(copy.deductMin))) { copy.deductMin = 0; changed = true; }
+    if (!Number.isFinite(Number(copy.totalMin))) {
+      copy.totalMin = sessionMinutes(copy);
+      changed = true;
+    }
+    if (!Number.isFinite(Number(copy.hours))) {
+      copy.hours = copy.totalMin / 60;
+      changed = true;
+    }
+    return copy;
+  });
+  if (changed) localStorage.setItem('vt_sessions', JSON.stringify(sessions));
+  return sessions;
+}
+function persistSessions() {
+  localStorage.setItem('vt_sessions', JSON.stringify(state.sessions));
+}
 let state = {
   running: false, startTime: null, endTime: null, manualDate: null,
   category: 'main', isManual: false, timerInterval: null,
-  sessions: JSON.parse(localStorage.getItem('vt_sessions') || '[]'),
+  sessions: loadSessions(),
   goal: parseFloat(localStorage.getItem('vt_goal') || '30')
 };
+let editingSessionId = null;
+let editCat = 'main';
 function todayStr() {
   const d = new Date();
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -223,7 +307,7 @@ function getMonthKey() {
 }
 function dateToMonthKey(s) { return s.slice(0,7); }
 function thisMonthSessions() { return state.sessions.filter(s => s.month === getMonthKey()); }
-function sumHours(arr) { return arr.reduce((a,s) => a + s.hours, 0); }
+function sumHours(arr) { return arr.reduce((a,s) => a + sessionMinutes(s), 0) / 60; }
 function mainHours() { return sumHours(thisMonthSessions().filter(s=>s.cat==='main')); }
 function otherHours() { return sumHours(thisMonthSessions().filter(s=>s.cat==='other')); }
 function allHours() { return mainHours() + otherHours(); }
@@ -354,6 +438,7 @@ function confirmSession() {
   netMin = Math.max(0, netMin - deductMin);
   const dateStr = state.manualDate;
   const session = {
+    id: makeSessionId(),
     month: dateToMonthKey(dateStr),
     date: dateStr.replace(/-/g,'/'),
     dateKey: dateStr,
@@ -361,11 +446,13 @@ function confirmSession() {
     start: fmtTime(state.startTime),
     end: fmtTime(state.endTime),
     deductMin: deductMin,
-    hours: Math.round(netMin / 60 * 10) / 10,
-    manual: state.isManual
+    totalMin: netMin,
+    hours: netMin / 60,
+    manual: state.isManual,
+    edited: false
   };
   state.sessions.push(session);
-  localStorage.setItem('vt_sessions', JSON.stringify(state.sessions));
+  persistSessions();
   deductRows = [];
   document.getElementById('deduct-card').style.display = 'none';
   document.getElementById('start-btn').style.display = 'block';
@@ -380,20 +467,110 @@ function confirmSession() {
 }
 function renderLog() {
   const container = document.getElementById('log-list');
-  const sessions = thisMonthSessions().slice().sort((a,b) => b.dateKey > a.dateKey ? 1 : -1);
-  if (sessions.length === 0) { container.innerHTML = '<div class="empty">記録がまだありません</div>'; return; }
+  const sessions = thisMonthSessions().slice().sort((a,b) => {
+    if (a.dateKey !== b.dateKey) return b.dateKey > a.dateKey ? 1 : -1;
+    if (a.start !== b.start) return b.start > a.start ? 1 : -1;
+    return String(b.id).localeCompare(String(a.id));
+  });
+  if (sessions.length === 0) {
+    container.innerHTML = '<div class="empty">記録がまだありません</div>';
+    cancelEditSession(false);
+    return;
+  }
   container.innerHTML = '';
   sessions.forEach(s => {
     const div = document.createElement('div');
     div.className = 'log-item';
+    if (s.id === editingSessionId) div.classList.add('editing');
     const deductNote = s.deductMin > 0 ? '（-'+s.deductMin+'分）' : '';
     const manualBadge = s.manual ? '<span class="badge badge-manual">手動</span>' : '';
-    div.innerHTML = '<div><div class="log-date-str">'+s.date+'</div>'+
-      '<div class="log-time-str">'+s.start+' 〜 '+s.end+deductNote+'</div></div>'+
-      '<div class="log-right"><div><span class="badge badge-'+(s.cat==='main'?'main':'other')+'">'+CAT_LABEL[s.cat]+'</span>'+manualBadge+'</div>'+
-      '<div class="log-hours">'+fmtHours(s.hours)+'</div></div>';
+    const editedBadge = s.edited ? '<span class="badge badge-edited">編集済</span>' : '';
+    div.innerHTML = '<div class="log-left"><div class="log-date-str">'+s.date+'</div>'+ 
+      '<div class="log-time-str">'+s.start+' 〜 '+s.end+deductNote+'</div>'+ 
+      '<div class="log-actions"><button class="log-edit-btn" type="button">編集</button></div></div>'+ 
+      '<div class="log-right"><div><span class="badge badge-'+(s.cat==='main'?'main':'other')+'">'+CAT_LABEL[s.cat]+'</span>'+manualBadge+editedBadge+'</div>'+ 
+      '<div class="log-hours">'+fmtHours(sessionMinutes(s) / 60)+'</div></div>';
+    div.querySelector('.log-edit-btn').addEventListener('click', () => startEditSession(s.id));
     container.appendChild(div);
   });
+}
+function selectEditCat(cat) {
+  editCat = cat;
+  document.getElementById('edit-cat-main').classList.toggle('active', cat==='main');
+  document.getElementById('edit-cat-other').classList.toggle('active', cat==='other');
+}
+function startEditSession(id) {
+  const session = state.sessions.find(s => s.id === id);
+  if (!session) { showToast('編集する記録が見つかりません'); return; }
+  editingSessionId = id;
+  selectEditCat(session.cat || 'main');
+  document.getElementById('edit-date').value = session.dateKey;
+  document.getElementById('edit-start').value = session.start;
+  document.getElementById('edit-end').value = session.end;
+  document.getElementById('edit-deduct').value = Number(session.deductMin) || 0;
+  document.getElementById('edit-sub').textContent = session.date + ' ' + session.start + ' 〜 ' + session.end;
+  document.getElementById('edit-card').style.display = 'block';
+  renderLog();
+  document.getElementById('edit-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+function cancelEditSession(resetId = true) {
+  const editCard = document.getElementById('edit-card');
+  if (editCard) editCard.style.display = 'none';
+  if (resetId) editingSessionId = null;
+}
+function getEditValues() {
+  const dateStr = document.getElementById('edit-date').value;
+  const start = document.getElementById('edit-start').value;
+  const end = document.getElementById('edit-end').value;
+  const deductMin = parseInt(document.getElementById('edit-deduct').value || '0', 10);
+  if (!dateStr || !start || !end) { showToast('日付・開始・終了を入力してください'); return null; }
+  const startMin = parseHM(start), endMin = parseHM(end);
+  if (startMin === null || endMin === null) { showToast('時刻を正しく入力してください'); return null; }
+  if (endMin <= startMin) { showToast('終了時刻は開始より後にしてください'); return null; }
+  if (isNaN(deductMin) || deductMin < 0) { showToast('中断時間は0分以上で入力してください'); return null; }
+  const grossMin = endMin - startMin;
+  if (deductMin >= grossMin) { showToast('中断時間が全体時間以上です'); return null; }
+  return { dateStr, start, end, deductMin, netMin: grossMin - deductMin };
+}
+function saveEditSession() {
+  if (!editingSessionId) { showToast('編集する記録が選択されていません'); return; }
+  const values = getEditValues();
+  if (!values) return;
+  const index = state.sessions.findIndex(s => s.id === editingSessionId);
+  if (index === -1) { showToast('編集する記録が見つかりません'); return; }
+  const prev = state.sessions[index];
+  state.sessions[index] = {
+    ...prev,
+    month: dateToMonthKey(values.dateStr),
+    date: values.dateStr.replace(/-/g,'/'),
+    dateKey: values.dateStr,
+    cat: editCat,
+    start: values.start,
+    end: values.end,
+    deductMin: values.deductMin,
+    totalMin: values.netMin,
+    hours: values.netMin / 60,
+    edited: true
+  };
+  persistSessions();
+  updateProgress();
+  renderSummary();
+  renderLog();
+  cancelEditSession();
+  showToast('記録を更新しました');
+}
+function deleteEditSession() {
+  if (!editingSessionId) { showToast('削除する記録が選択されていません'); return; }
+  const session = state.sessions.find(s => s.id === editingSessionId);
+  if (!session) { showToast('削除する記録が見つかりません'); return; }
+  if (!confirm(session.date+' '+session.start+' 〜 '+session.end+' の記録を削除しますか？')) return;
+  state.sessions = state.sessions.filter(s => s.id !== editingSessionId);
+  persistSessions();
+  updateProgress();
+  renderSummary();
+  cancelEditSession();
+  renderLog();
+  showToast('記録を削除しました');
 }
 function renderSummary() {
   const main = mainHours(), other = otherHours(), total = main + other;
@@ -417,10 +594,44 @@ function showTab(tab) {
     document.getElementById('view-'+t).style.display = t===tab ? 'block' : 'none';
     document.getElementById('tab-'+t).classList.toggle('active', t===tab);
   });
+  if (tab !== 'log') cancelEditSession();
   if (tab==='log') renderLog();
   if (tab==='summary') renderSummary();
   if (tab==='settings') document.getElementById('goal-input').value = state.goal;
 }
+function softHaptic() {
+  try {
+    if ('vibrate' in navigator) navigator.vibrate(8);
+  } catch (e) {}
+}
+function initPressFeedback() {
+  const pressSelector = 'button, .tab';
+  let activeEl = null;
+  let releaseTimer = null;
+  function clearPress(delay = 0) {
+    clearTimeout(releaseTimer);
+    releaseTimer = setTimeout(() => {
+      if (activeEl) activeEl.classList.remove('is-pressing');
+      activeEl = null;
+    }, delay);
+  }
+  function startPress(el) {
+    clearPress(0);
+    activeEl = el;
+    activeEl.classList.add('is-pressing');
+    softHaptic();
+  }
+  document.addEventListener('pointerdown', e => {
+    const el = e.target.closest(pressSelector);
+    if (!el) return;
+    startPress(el);
+  }, { passive: true });
+  document.addEventListener('pointerup', () => clearPress(90), { passive: true });
+  document.addEventListener('pointercancel', () => clearPress(0), { passive: true });
+  document.addEventListener('scroll', () => clearPress(0), { passive: true });
+  document.addEventListener('visibilitychange', () => clearPress(0));
+}
+initPressFeedback();
 updateHeader();
 updateProgress();
 </script>
