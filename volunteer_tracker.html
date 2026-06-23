@@ -131,11 +131,11 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
       <div class="card">
         <div class="progress-wrap">
           <div class="progress-nums">
-            <div class="progress-main" id="total-display">0.0 h</div>
-            <div class="progress-goal" id="goal-label">目標 30 h</div>
+            <div class="progress-main" id="total-display">0分</div>
+            <div class="progress-goal" id="goal-label">目標 30時間</div>
           </div>
           <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
-          <div class="progress-remain" id="progress-remain">残り 30.0 h</div>
+          <div class="progress-remain" id="progress-remain">残り 30時間</div>
         </div>
       </div>
       <div class="card">
@@ -210,11 +210,11 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
       <div class="card">
         <div class="summary-big">
           <div class="summary-label">合計時間</div>
-          <div class="summary-num" id="sum-total">0.0<span class="summary-unit"> h</span></div>
+          <div class="summary-num" id="sum-total">0分</div>
         </div>
-        <div class="summary-row"><span class="summary-row-label">野外奉仕</span><span class="summary-row-val" id="sum-main">0.0 h</span></div>
-        <div class="summary-row"><span class="summary-row-label">その他の奉仕</span><span class="summary-row-val" id="sum-other">0.0 h</span></div>
-        <div class="summary-remain" id="sum-remain">目標まで残り 30.0 h</div>
+        <div class="summary-row"><span class="summary-row-label">野外奉仕</span><span class="summary-row-val" id="sum-main">0分</span></div>
+        <div class="summary-row"><span class="summary-row-label">その他の奉仕</span><span class="summary-row-val" id="sum-other">0分</span></div>
+        <div class="summary-remain" id="sum-remain">目標まで残り 30時間</div>
       </div>
     </div>
   </div>
@@ -325,7 +325,7 @@ function updateProgress() {
   const remaining = Math.max(0, state.goal - total);
   const pct = Math.min(100, Math.round(total / state.goal * 100));
   document.getElementById('total-display').textContent = fmtHours(total);
-  document.getElementById('goal-label').textContent = '目標 '+state.goal+' h';
+  document.getElementById('goal-label').textContent = '目標 '+fmtGoalHours(state.goal);
   document.getElementById('progress-fill').style.width = pct+'%';
   document.getElementById('progress-remain').textContent = '残り '+fmtHours(remaining);
 }
@@ -368,9 +368,14 @@ function fmtHours(h) {
   const totalMin = Math.round(h * 60);
   const hrs = Math.floor(totalMin / 60);
   const min = totalMin % 60;
-  if (hrs === 0) return min + 'm';
-  if (min === 0) return hrs + 'h';
-  return hrs + 'h ' + min + 'm';
+  if (hrs === 0) return min + '分';
+  if (min === 0) return hrs + '時間';
+  return hrs + '時間' + min + '分';
+}
+function fmtGoalHours(h) {
+  const num = Number(h);
+  if (!Number.isFinite(num)) return '0時間';
+  return (Number.isInteger(num) ? String(num) : String(num).replace(/\.0$/, '')) + '時間';
 }
 function fmtTime(d) {
   return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
