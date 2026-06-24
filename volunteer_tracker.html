@@ -142,6 +142,13 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 .live-start-row input { flex: 1; font-size: 16px; padding: 10px 12px; border: 0.5px solid #c6c6c8; border-radius: 10px; background: #fff; color: #1c1c1e; -webkit-appearance: none; }
 .live-start-row input:focus { outline: none; border-color: #1D9E75; }
 .live-start-row button { border: none; background: #1D9E75; color: #fff; border-radius: 10px; padding: 10px 12px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.live-end-edit { display: none; margin: 12px 16px 0; padding: 12px; background: #f2f2f7; border-radius: 12px; text-align: left; }
+.live-end-edit.show { display: block; }
+.live-end-label { font-size: 13px; color: #8e8e93; margin-bottom: 8px; }
+.live-end-row { display: flex; gap: 8px; align-items: center; }
+.live-end-row input { flex: 1; font-size: 16px; padding: 10px 12px; border: 0.5px solid #c6c6c8; border-radius: 10px; background: #fff; color: #1c1c1e; -webkit-appearance: none; }
+.live-end-row input:focus { outline: none; border-color: #1D9E75; }
+.live-end-row button { border: none; background: #1D9E75; color: #fff; border-radius: 10px; padding: 10px 12px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 
 
 .goal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:500;padding:24px}
@@ -209,6 +216,13 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
         </div>
       </div>
       <div class="card" id="deduct-card" style="display:none">
+        <div class="live-end-edit" id="live-end-edit">
+          <div class="live-end-label">終了時刻を修正</div>
+          <div class="live-end-row">
+            <input type="time" id="live-end-time">
+            <button type="button" onclick="applyLiveEndTime()">反映</button>
+          </div>
+        </div>
         <div style="padding:16px 16px 4px">
           <div class="deduct-title">中断時間を差し引く（任意）</div>
           <div id="deduct-list"></div>
@@ -367,7 +381,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 
 <script>
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.06.24.4';
+const APP_VERSION = '2026.06.24.5';
 const BACKUP_SCHEMA_VERSION = 1;
 function makeSessionId() {
   return 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
@@ -575,6 +589,8 @@ function showManual() {
   document.getElementById('timer-section').style.display = 'none';
   document.getElementById('manual-section').style.display = 'block';
   document.getElementById('deduct-card').style.display = 'none';
+  const endEdit = document.getElementById('live-end-edit');
+  if (endEdit) endEdit.classList.remove('show');
 }
 function hideManual() {
   document.getElementById('manual-section').style.display = 'none';
@@ -615,6 +631,7 @@ function toggleTimer() {
     document.getElementById('timer-label').textContent = fmtTime(state.startTime)+' 〜 '+fmtTime(state.endTime);
     deductRows = [];
     document.getElementById('deduct-card').style.display = 'block';
+    updateLiveEndEditVisibility();
     renderDeductList();
   }
 }
@@ -658,6 +675,8 @@ function resetTimerInputUI() {
   document.getElementById('timer-label').textContent = '開始ボタンを押してください';
   const liveEdit = document.getElementById('live-start-edit');
   if (liveEdit) liveEdit.classList.remove('show');
+  const endEdit = document.getElementById('live-end-edit');
+  if (endEdit) endEdit.classList.remove('show');
 }
 function updateLiveStartEditVisibility() {
   const liveEdit = document.getElementById('live-start-edit');
@@ -692,6 +711,36 @@ function applyLiveStartTime() {
   document.getElementById('timer-label').textContent = '計測中... 開始 '+fmtTime(state.startTime);
   showToast('開始時刻を修正しました');
 }
+function updateLiveEndEditVisibility() {
+  const endEdit = document.getElementById('live-end-edit');
+  const endInput = document.getElementById('live-end-time');
+  if (!endEdit || !endInput) return;
+  if (!state.running && state.startTime && state.endTime) {
+    endEdit.classList.add('show');
+    endInput.value = fmtTime(state.endTime);
+  } else {
+    endEdit.classList.remove('show');
+  }
+}
+function applyLiveEndTime() {
+  if (state.running || !state.startTime || !state.endTime) { showToast('終了後のみ修正できます'); return; }
+  const input = document.getElementById('live-end-time');
+  const value = input ? input.value : '';
+  const mins = parseHM(value);
+  if (mins === null) { showToast('終了時刻を正しく入力してください'); return; }
+  if (!isSameLocalDate(state.startTime, state.endTime)) {
+    showToast('日付をまたいだ記録は手動入力してください');
+    return;
+  }
+  const newEnd = new Date(state.endTime);
+  newEnd.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+  if (!isSameLocalDate(state.startTime, newEnd)) { showToast('同じ日付内で入力してください'); return; }
+  if (newEnd <= state.startTime) { showToast('終了時刻は開始より後にしてください'); return; }
+  state.endTime = newEnd;
+  document.getElementById('timer-label').textContent = fmtTime(state.startTime)+' 〜 '+fmtTime(state.endTime);
+  updateLiveEndEditVisibility();
+  showToast('終了時刻を修正しました');
+}
 function updateTimerDisplay() {
   const diff = Math.max(0, Math.floor((new Date() - state.startTime) / 1000));
   const h = Math.floor(diff/3600), m = Math.floor((diff%3600)/60), s = diff%60;
@@ -718,6 +767,7 @@ function submitManual() {
   document.getElementById('timer-display').textContent = '00:00:00';
   document.getElementById('start-btn').style.display = 'none';
   document.getElementById('deduct-card').style.display = 'block';
+  updateLiveEndEditVisibility();
   renderDeductList();
 }
 let deductRows = [];
