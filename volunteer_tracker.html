@@ -135,6 +135,14 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 .notice-msg{font-size:15px;line-height:1.65;color:#1c1c1e;margin-bottom:18px;white-space:pre-line}
 .notice-actions{display:flex;gap:8px}
 .notice-actions button{flex:1}
+.live-start-edit { display: none; margin-top: 12px; padding: 12px; background: #f2f2f7; border-radius: 12px; text-align: left; }
+.live-start-edit.show { display: block; }
+.live-start-label { font-size: 13px; color: #8e8e93; margin-bottom: 8px; }
+.live-start-row { display: flex; gap: 8px; align-items: center; }
+.live-start-row input { flex: 1; font-size: 16px; padding: 10px 12px; border: 0.5px solid #c6c6c8; border-radius: 10px; background: #fff; color: #1c1c1e; -webkit-appearance: none; }
+.live-start-row input:focus { outline: none; border-color: #1D9E75; }
+.live-start-row button { border: none; background: #1D9E75; color: #fff; border-radius: 10px; padding: 10px 12px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+
 
 .goal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.35);display:none;align-items:center;justify-content:center;z-index:500;padding:24px}
 .goal-overlay.show{display:flex;animation:goalFade .25s ease}
@@ -177,6 +185,13 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
             <div class="timer-label" id="timer-label">開始ボタンを押してください</div>
             <div class="timer-display" id="timer-display">00:00:00</div>
             <button class="btn-primary btn-green" id="start-btn" onclick="toggleTimer()">開始</button>
+            <div class="live-start-edit" id="live-start-edit">
+              <div class="live-start-label">開始時刻を修正</div>
+              <div class="live-start-row">
+                <input type="time" id="live-start-time">
+                <button type="button" onclick="applyLiveStartTime()">反映</button>
+              </div>
+            </div>
           </div>
           <div style="padding:0 16px">
             <div class="divider"><div class="divider-line"></div><div class="divider-text">または</div><div class="divider-line"></div></div>
@@ -352,7 +367,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 
 <script>
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.06.24.1';
+const APP_VERSION = '2026.06.24.2';
 const BACKUP_SCHEMA_VERSION = 1;
 function makeSessionId() {
   return 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
@@ -500,6 +515,9 @@ function selectCat(cat) {
   document.getElementById('btn-other').classList.toggle('active', cat==='other');
 }
 function showManual() {
+  if (state.running) { showToast('計測中は終了してから手動入力してください'); return; }
+  const liveEdit = document.getElementById('live-start-edit');
+  if (liveEdit) liveEdit.classList.remove('show');
   document.getElementById('manual-date').value = todayStr();
   document.getElementById('timer-section').style.display = 'none';
   document.getElementById('manual-section').style.display = 'block';
@@ -514,15 +532,31 @@ function toggleTimer() {
     state.running = true; state.startTime = new Date();
     const btn = document.getElementById('start-btn');
     btn.textContent = '終了'; btn.className = 'btn-primary btn-red';
-    document.getElementById('timer-label').textContent = '計測中...';
+    document.getElementById('timer-label').textContent = '計測中... 開始 '+fmtTime(state.startTime);
     document.getElementById('timer-display').classList.add('running');
+    updateLiveStartEditVisibility();
+    updateTimerDisplay();
     state.timerInterval = setInterval(updateTimerDisplay, 1000);
   } else {
     state.running = false; state.endTime = new Date();
-    state.manualDate = todayStr(); state.isManual = false;
+    state.manualDate = formatDateKeyFromDate(state.startTime); state.isManual = false;
     clearInterval(state.timerInterval);
+    state.timerInterval = null;
+    if (!isSameLocalDate(state.startTime, state.endTime)) {
+      const startDate = formatDateKeyFromDate(state.startTime);
+      const startTime = fmtTime(state.startTime);
+      alert('日付をまたいでいます。\nこのままでは正しく記録できません。\n\n手動入力で正しい日付・開始時刻・終了時刻を入力してください。');
+      resetTimerInputUI();
+      showManual();
+      document.getElementById('manual-date').value = startDate;
+      document.getElementById('manual-start').value = startTime;
+      document.getElementById('manual-end').value = '';
+      return;
+    }
     document.getElementById('timer-display').classList.remove('running');
     document.getElementById('start-btn').style.display = 'none';
+    const liveEdit = document.getElementById('live-start-edit');
+    if (liveEdit) liveEdit.classList.remove('show');
     document.getElementById('timer-label').textContent = fmtTime(state.startTime)+' 〜 '+fmtTime(state.endTime);
     deductRows = [];
     document.getElementById('deduct-card').style.display = 'block';
@@ -545,8 +579,64 @@ function fmtGoalHours(h) {
 function fmtTime(d) {
   return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
 }
+function formatDateKeyFromDate(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function isSameLocalDate(a, b) {
+  return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+function resetTimerInputUI() {
+  state.running = false;
+  state.startTime = null;
+  state.endTime = null;
+  state.manualDate = null;
+  state.isManual = false;
+  if (state.timerInterval) clearInterval(state.timerInterval);
+  state.timerInterval = null;
+  const btn = document.getElementById('start-btn');
+  btn.style.display = 'block';
+  btn.textContent = '開始';
+  btn.className = 'btn-primary btn-green';
+  document.getElementById('timer-display').textContent = '00:00:00';
+  document.getElementById('timer-display').classList.remove('running');
+  document.getElementById('timer-label').textContent = '開始ボタンを押してください';
+  const liveEdit = document.getElementById('live-start-edit');
+  if (liveEdit) liveEdit.classList.remove('show');
+}
+function updateLiveStartEditVisibility() {
+  const liveEdit = document.getElementById('live-start-edit');
+  const liveInput = document.getElementById('live-start-time');
+  if (!liveEdit || !liveInput) return;
+  if (state.running && state.startTime) {
+    liveEdit.classList.add('show');
+    liveInput.value = fmtTime(state.startTime);
+  } else {
+    liveEdit.classList.remove('show');
+  }
+}
+function applyLiveStartTime() {
+  if (!state.running || !state.startTime) { showToast('計測中のみ修正できます'); return; }
+  const input = document.getElementById('live-start-time');
+  const value = input ? input.value : '';
+  const mins = parseHM(value);
+  if (mins === null) { showToast('開始時刻を正しく入力してください'); return; }
+  const now = new Date();
+  if (!isSameLocalDate(state.startTime, now)) {
+    alert('日付をまたいでいます。\nこのままでは正しく記録できません。\n\n手動入力で正しい日付・開始時刻・終了時刻を入力してください。');
+    resetTimerInputUI();
+    showManual();
+    return;
+  }
+  const newStart = new Date(state.startTime);
+  newStart.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+  if (newStart > now) { showToast('現在時刻より後には修正できません'); return; }
+  state.startTime = newStart;
+  updateTimerDisplay();
+  document.getElementById('timer-label').textContent = '計測中... 開始 '+fmtTime(state.startTime);
+  showToast('開始時刻を修正しました');
+}
 function updateTimerDisplay() {
-  const diff = Math.floor((new Date() - state.startTime) / 1000);
+  const diff = Math.max(0, Math.floor((new Date() - state.startTime) / 1000));
   const h = Math.floor(diff/3600), m = Math.floor((diff%3600)/60), s = diff%60;
   document.getElementById('timer-display').textContent =
     String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
@@ -597,6 +687,11 @@ function parseHM(str) {
   return h*60+m;
 }
 function confirmSession() {
+  if (!state.startTime || !state.endTime || !state.manualDate) { showToast('記録する時間が見つかりません'); return; }
+  if (!isSameLocalDate(state.startTime, state.endTime)) {
+    showToast('日付をまたいだ記録は手動入力してください');
+    return;
+  }
   const startMin = state.startTime.getHours()*60 + state.startTime.getMinutes();
   const endMin = state.endTime.getHours()*60 + state.endTime.getMinutes();
   let netMin = endMin - startMin;
@@ -625,11 +720,7 @@ function confirmSession() {
   persistSessions();
   deductRows = [];
   document.getElementById('deduct-card').style.display = 'none';
-  document.getElementById('start-btn').style.display = 'block';
-  document.getElementById('start-btn').textContent = '開始';
-  document.getElementById('start-btn').className = 'btn-primary btn-green';
-  document.getElementById('timer-display').textContent = '00:00:00';
-  document.getElementById('timer-label').textContent = '開始ボタンを押してください';
+  resetTimerInputUI();
   document.getElementById('manual-start').value = '';
   document.getElementById('manual-end').value = '';
   updateProgress();
