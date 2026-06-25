@@ -1,0 +1,51 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: バージョン文字列を自動更新
+        run: |
+          VERSION=$(TZ='Asia/Tokyo' date '+%Y.%m.%d')
+          COUNT=$(grep -o "const APP_VERSION = '$VERSION\.[0-9]*'" volunteer_tracker.html | grep -o '\.[0-9]*$' | tail -1 | tr -d '.')
+          if [ -z "$COUNT" ]; then
+            PATCH=1
+          else
+            PATCH=$((COUNT + 1))
+          fi
+          NEW_VERSION="${VERSION}.${PATCH}"
+          sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '$NEW_VERSION'/" volunteer_tracker.html
+          echo "Version: $NEW_VERSION"
+
+      - name: GitHub Pages用にセットアップ
+        uses: actions/configure-pages@v5
+
+      - name: ファイルをアップロード
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: デプロイ
+        id: deployment
+        uses: actions/deploy-pages@v4
