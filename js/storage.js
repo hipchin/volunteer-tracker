@@ -1,6 +1,6 @@
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.06.29.split-1';
-const BACKUP_SCHEMA_VERSION = 1;
+const APP_VERSION = '2026.06.29.annual-1';
+const BACKUP_SCHEMA_VERSION = 2;
 
 function makeSessionId() {
   return 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
@@ -92,6 +92,7 @@ function buildBackupObject(reason = 'manual') {
     reason,
     exportedAt: new Date().toISOString(),
     goal: state.goal,
+    annualGoal: state.annualGoal,
     lessons: { ...state.lessons },
     reported: { ...state.reported },
     goalStatus: { ...state.goalStatus },

@@ -8,6 +8,10 @@ var state = {
   timerInterval: null,
   sessions: loadSessions(),
   goal: parseFloat(localStorage.getItem('vt_goal') || '30'),
+  annualGoal: (() => {
+    const value = parseFloat(localStorage.getItem('vt_annual_goal') || '600');
+    return Number.isFinite(value) && value > 0 ? value : 600;
+  })(),
   selectedMonth: getMonthKey(),
   lessons: loadMap('vt_lessons'),
   reported: loadMap('vt_reported_months'),
@@ -26,6 +30,17 @@ function sumHours(arr) { return arr.reduce((a, s) => a + sessionMinutes(s), 0) /
 function mainHours(monthKey = getMonthKey()) { return sumHours(sessionsForMonth(monthKey).filter(s => s.cat === 'main')); }
 function otherHours(monthKey = getMonthKey()) { return sumHours(sessionsForMonth(monthKey).filter(s => s.cat === 'other')); }
 function allHours(monthKey = getMonthKey()) { return mainHours(monthKey) + otherHours(monthKey); }
+function sessionsForFiscalYear(monthKey = state.selectedMonth) {
+  const fy = fiscalYearOf(monthKey);
+  return state.sessions.filter(s => {
+    const key = s.month || (s.dateKey ? dateToMonthKey(s.dateKey) : '');
+    if (!key) return false;
+    return fiscalYearOf(key) === fy;
+  });
+}
+function annualHours(monthKey = state.selectedMonth) {
+  return sumHours(sessionsForFiscalYear(monthKey));
+}
 
 function getLessonCount(monthKey) {
   const n = parseInt(state.lessons[monthKey] || '0', 10);
@@ -384,6 +399,7 @@ function importBackupFile(event) {
       if (!data || data.app !== 'volunteer-tracker') throw new Error('奉仕記録のバックアップではありません');
       const sessions = normalizeImportedSessions(data.sessions);
       const goal = parseFloat(data.goal);
+      const annualGoal = parseFloat(data.annualGoal);
       const totalMin = sessions.reduce((sum, s) => sum + sessionMinutes(s), 0);
       const dates = sessions.map(s => s.dateKey).sort();
       const period = dates.length ? dates[0].replace(/-/g, '/') + '〜' + dates[dates.length - 1].replace(/-/g, '/') : '記録なし';
@@ -392,11 +408,13 @@ function importBackupFile(event) {
       storeSafetyBackup('vt_pre_restore_backup', 'before-restore');
       state.sessions = sessions;
       state.goal = Number.isFinite(goal) && goal > 0 ? goal : 30;
+      state.annualGoal = Number.isFinite(annualGoal) && annualGoal > 0 ? annualGoal : 600;
       state.lessons = data.lessons && typeof data.lessons === 'object' && !Array.isArray(data.lessons) ? data.lessons : {};
       state.reported = data.reported && typeof data.reported === 'object' && !Array.isArray(data.reported) ? data.reported : {};
       state.goalStatus = data.goalStatus && typeof data.goalStatus === 'object' && !Array.isArray(data.goalStatus) ? data.goalStatus : {};
       persistSessions();
       localStorage.setItem('vt_goal', state.goal);
+      localStorage.setItem('vt_annual_goal', state.annualGoal);
       saveMap('vt_lessons', state.lessons);
       saveMap('vt_reported_months', state.reported);
       saveMap('vt_goal_status', state.goalStatus);
@@ -405,6 +423,8 @@ function importBackupFile(event) {
       renderSummary();
       renderLog();
       document.getElementById('goal-input').value = state.goal;
+      const annualGoalInput = document.getElementById('annual-goal-input');
+      if (annualGoalInput) annualGoalInput.value = state.annualGoal;
       showToast('バックアップを復元しました');
     } catch (e) {
       showToast('バックアップを読み込めませんでした');
@@ -494,6 +514,19 @@ function saveGoal() {
     showToast('目標を保存しました');
     checkGoalAchievement();
   }
+}
+
+function saveAnnualGoal() {
+  const input = document.getElementById('annual-goal-input');
+  const val = parseFloat(input ? input.value : '');
+  if (!Number.isFinite(val) || val <= 0) {
+    showToast('年次目標を正しく入力してください');
+    return;
+  }
+  state.annualGoal = val;
+  localStorage.setItem('vt_annual_goal', val);
+  renderSummary();
+  showToast('年次目標を保存しました');
 }
 
 function checkGoalAchievement(monthKey = getMonthKey()) {
@@ -587,6 +620,6 @@ Object.assign(window, {
   selectEditCat, startEditSession, cancelEditSession, saveEditSession, deleteEditSession,
   exportBackup, openImportBackup, importBackupFile, reloadLatestApp,
   changeSelectedMonth, saveLessonCount, markReportDone, openPendingReport, snoozeReportNotice,
-  saveGoal, showTab, hideGoalBanner,
+  saveGoal, saveAnnualGoal, showTab, hideGoalBanner,
   deductRows
 });

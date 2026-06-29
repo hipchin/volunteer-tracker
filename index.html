@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#f2f2f7">
 <link rel="apple-touch-icon" sizes="180x180" href="/volunteer-tracker/apple-touch-icon-v2.png">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="css/style.css?v=20260629-1">
+<link rel="stylesheet" href="css/style.css?v=20260629-2">
 <title>奉仕時間記録</title>
 </head>
 <body>
@@ -137,6 +137,21 @@
         <div class="summary-row"><span class="summary-row-label">レッスン</span><span class="summary-row-val"><input type="number" class="lesson-input" id="lesson-input" min="0" step="1" inputmode="numeric" onchange="saveLessonCount()"> 件</span></div>
         <div class="summary-remain" id="sum-remain">目標まで残り 30時間</div>
       </div>
+      <div class="card annual-summary-card">
+        <div class="annual-summary-head">
+          <div>
+            <div class="summary-label">年度目標</div>
+            <div class="annual-fiscal-label" id="annual-fiscal-label">-</div>
+          </div>
+          <div class="annual-goal-small" id="annual-goal-label">目標 600時間</div>
+        </div>
+        <div class="annual-total-row">
+          <span class="summary-row-label">年度合計</span>
+          <span class="summary-row-val" id="annual-total">0分</span>
+        </div>
+        <div class="progress-bar annual-progress-bar"><div class="progress-fill" id="annual-progress-fill" style="width:0%"></div></div>
+        <div class="summary-remain" id="annual-remain">年度目標まで残り 600時間</div>
+      </div>
       <div class="card">
         <div class="report-card-title" id="report-title">奉仕報告</div>
         <div class="report-card-sub" id="report-summary-text">月別の奉仕報告を確認できます。</div>
@@ -161,10 +176,22 @@
         </div>
       </div>
       <div style="font-size:13px;color:#8e8e93;padding:8px 4px">毎月この値がデフォルト目標として適用されます。</div>
+      <div class="section-header">年次目標</div>
+      <div class="card">
+        <div class="setting-row">
+          <span class="setting-label">年度目標時間</span>
+          <div style="display:flex;align-items:center">
+            <input type="number" class="setting-input annual-goal-input" id="annual-goal-input" value="600" min="1" max="9999">
+            <span class="setting-unit">時間</span>
+            <button class="setting-save" onclick="saveAnnualGoal()" style="margin-left:10px">保存</button>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:#8e8e93;padding:8px 4px">9月〜翌8月の年度目標として適用されます。</div>
       <div class="section-header">バックアップ</div>
       <div class="card">
         <div class="setting-row">
-          <div><div class="setting-label">バックアップを書き出す</div><div class="setting-desc">記録と目標時間をJSONファイルに保存します。</div></div>
+          <div><div class="setting-label">バックアップを書き出す</div><div class="setting-desc">記録・月次目標・年次目標をJSONファイルに保存します。</div></div>
           <button class="setting-save" onclick="exportBackup()">書き出し</button>
         </div>
         <div class="setting-row">
@@ -198,9 +225,9 @@
 <div class="notice-overlay" id="report-notice-overlay"><div class="notice-card"><div class="notice-title">📌 奉仕報告の確認</div><div class="notice-msg">先月分の奉仕報告がまだ完了していません。\n\n集計画面で内容を確認し、\nレッスン件数を入力してください。</div><div class="notice-actions"><button class="btn-primary btn-green" onclick="openPendingReport()">集計を開く</button><button class="btn-primary btn-gray" onclick="snoozeReportNotice()">あとで</button></div></div></div>
 <div class="goal-overlay" id="goal-overlay" onclick="hideGoalBanner()"><div class="goal-card"><div class="goal-title">🎉目標達成！</div><div class="goal-msg">よく頑張りました！<br>あなたは忠実な良い奴隷です。</div></div></div>
 
-<script src="js/storage.js?v=20260629-1"></script>
-<script src="js/time.js?v=20260629-1"></script>
-<script src="js/ui.js?v=20260629-1"></script>
-<script src="js/app.js?v=20260629-1"></script>
+<script src="js/storage.js?v=20260629-2"></script>
+<script src="js/time.js?v=20260629-2"></script>
+<script src="js/ui.js?v=20260629-2"></script>
+<script src="js/app.js?v=20260629-2"></script>
 </body>
 </html>

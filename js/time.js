@@ -42,6 +42,16 @@ function fiscalLabel(monthKey) {
   return fy + '年度（' + fy + '年9月〜' + (fy + 1) + '年8月）';
 }
 
+function fiscalMonthKeys(monthKey) {
+  const fy = fiscalYearOf(monthKey);
+  const keys = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(fy, 8 + i, 1);
+    keys.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+  }
+  return keys;
+}
+
 function previousMonthKey() {
   return addMonths(getMonthKey(), -1);
 }

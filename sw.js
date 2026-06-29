@@ -1,5 +1,5 @@
 // volunteer-tracker Service Worker — network-first update behavior
-const CACHE_VERSION = 'volunteer-tracker-split-20260629-1';
+const CACHE_VERSION = 'volunteer-tracker-split-20260629-2';
 
 self.addEventListener('install', event => {
   self.skipWaiting();

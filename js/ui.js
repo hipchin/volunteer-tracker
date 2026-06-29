@@ -156,6 +156,21 @@ function renderSummary() {
   document.getElementById('sum-main').textContent = fmtHours(main);
   document.getElementById('sum-other').textContent = fmtHours(other);
   document.getElementById('sum-remain').textContent = '目標まで残り ' + fmtHours(remaining);
+
+  const annualTotal = annualHours(state.selectedMonth);
+  const annualRemaining = Math.max(0, state.annualGoal - annualTotal);
+  const annualPct = state.annualGoal > 0 ? Math.min(100, Math.round(annualTotal / state.annualGoal * 100)) : 0;
+  const annualFiscalLabel = document.getElementById('annual-fiscal-label');
+  const annualGoalLabel = document.getElementById('annual-goal-label');
+  const annualTotalEl = document.getElementById('annual-total');
+  const annualRemainEl = document.getElementById('annual-remain');
+  const annualProgressEl = document.getElementById('annual-progress-fill');
+  if (annualFiscalLabel) annualFiscalLabel.textContent = fiscalLabel(state.selectedMonth);
+  if (annualGoalLabel) annualGoalLabel.textContent = '目標 ' + fmtGoalHours(state.annualGoal);
+  if (annualTotalEl) annualTotalEl.textContent = fmtHours(annualTotal);
+  if (annualRemainEl) annualRemainEl.textContent = annualRemaining > 0 ? '年度目標まで残り ' + fmtHours(annualRemaining) : '年度目標を達成しています';
+  if (annualProgressEl) annualProgressEl.style.width = annualPct + '%';
+
   const lessonInput = document.getElementById('lesson-input');
   if (lessonInput) lessonInput.value = getLessonCount(state.selectedMonth);
   const reportTitle = document.getElementById('report-title');
@@ -178,6 +193,8 @@ function showTab(tab) {
   if (tab === 'summary') renderSummary();
   if (tab === 'settings') {
     document.getElementById('goal-input').value = state.goal;
+    const annualGoalInput = document.getElementById('annual-goal-input');
+    if (annualGoalInput) annualGoalInput.value = state.annualGoal;
     updateAppInfo();
   }
 }
