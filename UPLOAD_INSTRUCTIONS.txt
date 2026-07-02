@@ -1,0 +1,35 @@
+アップロードするファイル:
+
+1. js/app-version.js
+   - 新規追加
+   - 今後の更新時は、原則このファイル内の VT_APP_BUILD / VT_APP_VERSION_LABEL を変更する。
+
+2. js/carryover-update.js
+   - 新規追加、または前回版を置き換え
+   - 野外奉仕の分数繰越と、更新ボタン改善を担当する。
+   - vt_sessions は変更しない。
+
+3. sw.js
+   - 既存ファイルを置き換え
+   - アプリ本体のキャッシュを持たない方針に変更する。
+
+4. index.html
+   - app.js の直後、</body> の直前に以下の2行を追加する。
+
+<script src="js/app-version.js?v=20260702-2"></script>
+<script src="js/carryover-update.js?v=20260702-2"></script>
+
+既に carryover-update.js の読み込み行がある場合は、重複させず上記に置き換える。
+
+可能なら、既存の読み込み行も同じ v=20260702-2 にそろえる。
+
+<link rel="stylesheet" href="css/style.css?v=20260702-2">
+<script src="js/storage.js?v=20260702-2"></script>
+<script src="js/time.js?v=20260702-2"></script>
+<script src="js/ui.js?v=20260702-2"></script>
+<script src="js/app.js?v=20260702-2"></script>
+
+次回以降の運用:
+- 機能追加・修正をしたら js/app-version.js の2行を更新する。
+- index.html 側の ?v=... も同じ値にそろえると最も安全。
+- ただし、今回の sw.js と更新ボタン改善により、古いキャッシュが残るリスクは前回より下がる。

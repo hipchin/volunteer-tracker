@@ -1,5 +1,6 @@
-// volunteer-tracker Service Worker — network-first update behavior
-const CACHE_VERSION = 'volunteer-tracker-split-20260629-2';
+// volunteer-tracker Service Worker — no-cache update helper
+// This Service Worker intentionally avoids app-shell caching.
+const CACHE_VERSION = 'volunteer-tracker-nocache-20260702-2';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
@@ -8,7 +9,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE_VERSION).map(key => caches.delete(key))))
+      .then(keys => Promise.all(keys.map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
@@ -18,5 +19,6 @@ self.addEventListener('message', event => {
 });
 
 self.addEventListener('fetch', event => {
-  return;
+  if (event.request.method !== 'GET') return;
+  event.respondWith(fetch(event.request, { cache: 'no-store' }));
 });
