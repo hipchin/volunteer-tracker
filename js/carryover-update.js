@@ -1,9 +1,14 @@
 // volunteer-tracker carryover + robust update patch
 // Loaded after app.js. This file intentionally does not change vt_sessions.
-// Uses js/app-version.js when available.
+// Carryover rule:
+// - Do NOT carry over the current month's remainder automatically.
+// - When a month is marked as reported, only that month's main-service remainder is confirmed
+//   and carried into the next month.
+// - Other service is never carried over.
 
 (function () {
   const CARRYOVER_ENABLED_KEY = 'vt_main_carryover_enabled';
+  const CARRYOVER_MAP_KEY = 'vt_main_carryovers';
 
   function appBuild() {
     return String(window.VT_APP_BUILD || 'dev');
@@ -19,6 +24,19 @@
 
   function setCarryoverEnabled(value) {
     localStorage.setItem(CARRYOVER_ENABLED_KEY, value ? 'true' : 'false');
+  }
+
+  function loadCarryoverMap() {
+    try {
+      const value = JSON.parse(localStorage.getItem(CARRYOVER_MAP_KEY) || '{}');
+      return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveCarryoverMap(map) {
+    localStorage.setItem(CARRYOVER_MAP_KEY, JSON.stringify(map || {}));
   }
 
   function safeSessionMinutes(session) {
@@ -39,51 +57,62 @@
       .reduce((sum, s) => sum + safeSessionMinutes(s), 0);
   }
 
-  function earliestRelevantMonth(targetMonthKey) {
-    const months = state.sessions
-      .map(s => s.month || (s.dateKey ? dateToMonthKey(s.dateKey) : ''))
-      .filter(Boolean)
-      .sort();
-    if (!months.length) return targetMonthKey;
-    return months[0] < targetMonthKey ? months[0] : targetMonthKey;
+  function confirmedCarryInMinutes(monthKey) {
+    if (!carryoverEnabled()) return 0;
+    const entry = loadCarryoverMap()[monthKey];
+    if (Number.isFinite(Number(entry))) return Math.max(0, parseInt(entry, 10) || 0);
+    if (entry && typeof entry === 'object' && Number.isFinite(Number(entry.minutes))) {
+      return Math.max(0, parseInt(entry.minutes, 10) || 0);
+    }
+    return 0;
+  }
+
+  function confirmedCarryOutEntry(monthKey) {
+    const nextMonth = addMonths(monthKey, 1);
+    const entry = loadCarryoverMap()[nextMonth];
+    if (!entry || typeof entry !== 'object') return null;
+    return entry.fromMonth === monthKey ? entry : null;
+  }
+
+  function hasConfirmedCarryOut(monthKey) {
+    return Boolean(confirmedCarryOutEntry(monthKey));
+  }
+
+  function baseMainTotalMinutes(monthKey) {
+    return confirmedCarryInMinutes(monthKey) + rawMainMinutesForMonth(monthKey);
+  }
+
+  function displayMainMinutesForMonth(monthKey) {
+    const total = baseMainTotalMinutes(monthKey);
+    if (!carryoverEnabled()) return rawMainMinutesForMonth(monthKey);
+
+    // If this month has already been finalized and its remainder was sent forward,
+    // show only whole-hour main-service time for this reported month.
+    if (hasConfirmedCarryOut(monthKey)) return total - (total % 60);
+
+    // Before reporting, show the actual accumulated total including confirmed carry-in.
+    return total;
   }
 
   function mainCarryoverInfo(monthKey) {
-    if (!carryoverEnabled()) {
-      const raw = rawMainMinutesForMonth(monthKey);
-      return {
-        enabled: false,
-        monthKey,
-        carryInMin: 0,
-        rawMin: raw,
-        adjustedMin: raw,
-        carryOutMin: 0
-      };
-    }
-
-    let cursor = earliestRelevantMonth(monthKey);
-    let carry = 0;
-
-    while (cursor < monthKey) {
-      const total = carry + rawMainMinutesForMonth(cursor);
-      carry = total % 60;
-      cursor = addMonths(cursor, 1);
-    }
-
-    const raw = rawMainMinutesForMonth(monthKey);
-    const total = carry + raw;
+    const carryInMin = confirmedCarryInMinutes(monthKey);
+    const rawMin = rawMainMinutesForMonth(monthKey);
+    const totalMin = carryInMin + rawMin;
+    const outEntry = confirmedCarryOutEntry(monthKey);
     return {
-      enabled: true,
+      enabled: carryoverEnabled(),
       monthKey,
-      carryInMin: carry,
-      rawMin: raw,
-      adjustedMin: total - (total % 60),
-      carryOutMin: total % 60
+      carryInMin,
+      rawMin,
+      totalMin,
+      displayMin: displayMainMinutesForMonth(monthKey),
+      carryOutMin: outEntry ? Math.max(0, parseInt(outEntry.minutes, 10) || 0) : 0,
+      carryOutConfirmed: Boolean(outEntry)
     };
   }
 
-  function mainHoursWithCarryover(monthKey = getMonthKey()) {
-    return mainCarryoverInfo(monthKey).adjustedMin / 60;
+  function mainHoursPatched(monthKey = getMonthKey()) {
+    return displayMainMinutesForMonth(monthKey) / 60;
   }
 
   function otherHoursPatched(monthKey = getMonthKey()) {
@@ -91,17 +120,73 @@
   }
 
   function allHoursPatched(monthKey = getMonthKey()) {
-    return mainHoursWithCarryover(monthKey) + otherHoursPatched(monthKey);
+    return mainHoursPatched(monthKey) + otherHoursPatched(monthKey);
   }
 
   function annualHoursPatched(monthKey = state.selectedMonth) {
     const keys = fiscalMonthKeys(monthKey);
     const totalMin = keys.reduce((sum, key) => {
-      const mainMin = Math.round(mainHoursWithCarryover(key) * 60);
-      const otherMin = rawOtherMinutesForMonth(key);
-      return sum + mainMin + otherMin;
+      return sum + displayMainMinutesForMonth(key) + rawOtherMinutesForMonth(key);
     }, 0);
     return totalMin / 60;
+  }
+
+  function confirmCarryoverForMonth(monthKey, reason = 'reported') {
+    if (!carryoverEnabled()) return 0;
+
+    const total = baseMainTotalMinutes(monthKey);
+    const remainder = total % 60;
+    const nextMonth = addMonths(monthKey, 1);
+    const map = loadCarryoverMap();
+
+    if (remainder > 0) {
+      map[nextMonth] = {
+        fromMonth: monthKey,
+        minutes: remainder,
+        confirmedAt: new Date().toISOString(),
+        reason
+      };
+    } else {
+      const existing = map[nextMonth];
+      if (existing && typeof existing === 'object' && existing.fromMonth === monthKey) {
+        delete map[nextMonth];
+      }
+    }
+
+    saveCarryoverMap(map);
+    return remainder;
+  }
+
+  function migrateReportedCarryovers() {
+    if (!carryoverEnabled() || !state || !state.reported) return;
+
+    const map = loadCarryoverMap();
+    let changed = false;
+
+    Object.keys(state.reported)
+      .filter(monthKey => state.reported[monthKey] === true)
+      .sort()
+      .forEach(monthKey => {
+        const nextMonth = addMonths(monthKey, 1);
+        const existing = map[nextMonth];
+        const alreadyFromThisMonth = existing && typeof existing === 'object' && existing.fromMonth === monthKey;
+        if (alreadyFromThisMonth) return;
+
+        const total = confirmedCarryInMinutes(monthKey) + rawMainMinutesForMonth(monthKey);
+        const remainder = total % 60;
+
+        if (remainder > 0) {
+          map[nextMonth] = {
+            fromMonth: monthKey,
+            minutes: remainder,
+            confirmedAt: new Date().toISOString(),
+            reason: 'migration-from-reported-month'
+          };
+          changed = true;
+        }
+      });
+
+    if (changed) saveCarryoverMap(map);
   }
 
   function ensureCarryoverSummaryRow() {
@@ -127,8 +212,17 @@
       row.style.display = 'none';
       return;
     }
+
     row.style.display = 'flex';
-    el.textContent = '前月から +' + fmtHours(info.carryInMin / 60) + ' / 次月へ ' + fmtHours(info.carryOutMin / 60);
+
+    const parts = [];
+    if (info.carryInMin > 0) parts.push('前月から +' + fmtHours(info.carryInMin / 60));
+    else parts.push('前月から 0分');
+
+    if (info.carryOutConfirmed) parts.push('次月へ ' + fmtHours(info.carryOutMin / 60));
+    else parts.push('次月へ 未確定');
+
+    el.textContent = parts.join(' / ');
   }
 
   function ensureCarryoverSetting() {
@@ -144,7 +238,7 @@
     card.className = 'card';
     card.innerHTML = '<div class="setting-row" id="carryover-setting-row">' +
       '<div><div class="setting-label">野外奉仕の分数繰越</div>' +
-      '<div class="setting-desc">野外奉仕だけ、60分未満の端数を次月へ自動で繰り越します。</div></div>' +
+      '<div class="setting-desc">報告済みにした月の野外奉仕端数だけを、翌月へ繰り越します。</div></div>' +
       '<label class="toggle-switch"><input type="checkbox" id="carryover-enabled-input"><span></span></label>' +
       '</div>';
 
@@ -161,12 +255,37 @@
       input.checked = carryoverEnabled();
       input.addEventListener('change', () => {
         setCarryoverEnabled(input.checked);
+        if (input.checked) migrateReportedCarryovers();
         updateProgress();
         renderSummary();
         checkGoalAchievement();
         showToast(input.checked ? '分数繰越を有効にしました' : '分数繰越を無効にしました');
       });
     }
+  }
+
+  function patchMarkReportDone() {
+    const originalMarkReportDone = window.markReportDone;
+    window.markReportDone = function patchedMarkReportDone() {
+      const monthKey = state.selectedMonth;
+      const carryMin = confirmCarryoverForMonth(monthKey, 'mark-report-done');
+
+      if (typeof originalMarkReportDone === 'function') {
+        originalMarkReportDone();
+      } else {
+        setReported(monthKey, true);
+      }
+
+      updateProgress();
+      renderSummary();
+
+      if (carryoverEnabled() && carryMin > 0) {
+        showToast(monthLabel(monthKey) + 'を報告済みにし、' + fmtHours(carryMin / 60) + 'を翌月へ繰り越しました');
+      } else if (carryoverEnabled()) {
+        showToast(monthLabel(monthKey) + 'を報告済みにしました。繰り越し分はありません');
+      }
+    };
+    markReportDone = window.markReportDone;
   }
 
   function patchRenderSummary() {
@@ -190,7 +309,7 @@
 
   function patchReportText() {
     window.reportTextForMonth = function patchedReportTextForMonth(monthKey) {
-      const main = mainHoursWithCarryover(monthKey);
+      const main = mainHoursPatched(monthKey);
       const other = otherHoursPatched(monthKey);
       const lessons = getLessonCount(monthKey);
       return monthShortLabel(monthKey) + '奉仕報告\n\n野外奉仕 ' + fmtHours(main) + '\nその他の奉仕 ' + fmtHours(other) + '\nレッスン ' + lessons + '件';
@@ -261,7 +380,8 @@
       return rawMainMinutesForMonth(monthKey) / 60;
     };
     window.mainCarryoverInfo = mainCarryoverInfo;
-    window.mainHours = mainHoursWithCarryover;
+    window.confirmMainCarryoverForMonth = confirmCarryoverForMonth;
+    window.mainHours = mainHoursPatched;
     window.otherHours = otherHoursPatched;
     window.allHours = allHoursPatched;
     window.annualHours = annualHoursPatched;
@@ -271,7 +391,6 @@
     allHours = window.allHours;
     annualHours = window.annualHours;
   }
-
 
   function patchUpdateAppInfo() {
     const originalUpdateAppInfo = window.updateAppInfo;
@@ -288,12 +407,16 @@
     patchCoreCalculations();
     patchUpdateAppInfo();
     patchReportText();
+    patchMarkReportDone();
     patchRenderSummary();
     patchShowTab();
     window.reloadLatestApp = robustReloadLatestApp;
     reloadLatestApp = window.reloadLatestApp;
 
+    migrateReportedCarryovers();
+
     updateProgress();
+    updateAppInfo();
     if (document.getElementById('view-summary')?.style.display !== 'none') renderSummary();
   }
 
