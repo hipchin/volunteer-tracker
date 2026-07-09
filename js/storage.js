@@ -1,6 +1,7 @@
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.06.29.annual-1';
+const APP_VERSION = '2026.07.09.performance-1';
 const BACKUP_SCHEMA_VERSION = 2;
+const SESSION_NORMALIZED_VERSION = 2;
 
 function makeSessionId() {
   return 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
@@ -19,6 +20,12 @@ function loadSessions() {
   } catch (e) {
     sessions = [];
   }
+
+  const normalizedVersion = localStorage.getItem('vt_sessions_normalized_version');
+  if (normalizedVersion === String(SESSION_NORMALIZED_VERSION)) {
+    return sessions;
+  }
+
   let changed = false;
   sessions = sessions.map(s => {
     const copy = { ...s };
@@ -34,12 +41,16 @@ function loadSessions() {
     copy.edited = Boolean(copy.edited);
     return copy;
   });
+
   if (changed) localStorage.setItem('vt_sessions', JSON.stringify(sessions));
+  localStorage.setItem('vt_sessions_normalized_version', String(SESSION_NORMALIZED_VERSION));
   return sessions;
 }
 
 function persistSessions() {
   localStorage.setItem('vt_sessions', JSON.stringify(state.sessions));
+  localStorage.setItem('vt_sessions_normalized_version', String(SESSION_NORMALIZED_VERSION));
+  if (typeof invalidateSessionStatsCache === 'function') invalidateSessionStatsCache();
 }
 
 function loadMap(key) {
@@ -103,6 +114,7 @@ function buildBackupObject(reason = 'manual') {
 function storeSafetyBackup(key, reason) {
   try {
     localStorage.setItem(key, JSON.stringify(buildBackupObject(reason)));
+    localStorage.setItem(key + '_saved_at', new Date().toISOString());
     return true;
   } catch (e) {
     return false;

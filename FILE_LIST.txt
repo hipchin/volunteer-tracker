@@ -1,0 +1,20 @@
+volunteer-tracker-performance-update-20260709-fixed.zip
+
+含まれるファイル:
+- index.html
+- css/style.css
+- js/storage.js
+- js/time.js
+- js/ui.js
+- js/app.js
+- js/app-version.js
+- README.md
+- CHANGELOG.md
+- TODO.md
+- PROJECT_CONTEXT_APPEND_20260709.md
+- UPLOAD_INSTRUCTIONS.md
+
+含めていないファイル:
+- js/carryover-update.js
+  - 理由: 今回は既存の繰り越しパッチを変更しないため。
+  - 注意: GitHub上の既存ファイルを削除しないでください。

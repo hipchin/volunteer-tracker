@@ -20,6 +20,44 @@ var state = {
 var editingSessionId = null;
 var editCat = 'main';
 var deductRows = [];
+var sessionStatsCache = null;
+
+function invalidateSessionStatsCache() {
+  sessionStatsCache = null;
+}
+
+function emptyMonthStats() {
+  return { mainMin: 0, otherMin: 0, totalMin: 0, count: 0 };
+}
+
+function buildSessionStatsCache() {
+  const months = {};
+  const fiscalYears = {};
+  state.sessions.forEach(s => {
+    const monthKey = s.month || (s.dateKey ? dateToMonthKey(s.dateKey) : '');
+    if (!monthKey) return;
+    const minutes = sessionMinutes(s);
+    if (!months[monthKey]) months[monthKey] = emptyMonthStats();
+    months[monthKey].totalMin += minutes;
+    months[monthKey].count += 1;
+    if (s.cat === 'other') months[monthKey].otherMin += minutes;
+    else months[monthKey].mainMin += minutes;
+
+    const fy = fiscalYearOf(monthKey);
+    if (!fiscalYears[fy]) fiscalYears[fy] = 0;
+    fiscalYears[fy] += minutes;
+  });
+  sessionStatsCache = { months, fiscalYears };
+  return sessionStatsCache;
+}
+
+function getSessionStatsCache() {
+  return sessionStatsCache || buildSessionStatsCache();
+}
+
+function getMonthStats(monthKey) {
+  return getSessionStatsCache().months[monthKey] || emptyMonthStats();
+}
 
 function sessionsForMonth(monthKey) {
   return state.sessions.filter(s => s.month === monthKey);
@@ -27,9 +65,9 @@ function sessionsForMonth(monthKey) {
 function thisMonthSessions() { return sessionsForMonth(getMonthKey()); }
 function selectedMonthSessions() { return sessionsForMonth(state.selectedMonth); }
 function sumHours(arr) { return arr.reduce((a, s) => a + sessionMinutes(s), 0) / 60; }
-function mainHours(monthKey = getMonthKey()) { return sumHours(sessionsForMonth(monthKey).filter(s => s.cat === 'main')); }
-function otherHours(monthKey = getMonthKey()) { return sumHours(sessionsForMonth(monthKey).filter(s => s.cat === 'other')); }
-function allHours(monthKey = getMonthKey()) { return mainHours(monthKey) + otherHours(monthKey); }
+function mainHours(monthKey = getMonthKey()) { return getMonthStats(monthKey).mainMin / 60; }
+function otherHours(monthKey = getMonthKey()) { return getMonthStats(monthKey).otherMin / 60; }
+function allHours(monthKey = getMonthKey()) { return getMonthStats(monthKey).totalMin / 60; }
 function sessionsForFiscalYear(monthKey = state.selectedMonth) {
   const fy = fiscalYearOf(monthKey);
   return state.sessions.filter(s => {
@@ -39,7 +77,8 @@ function sessionsForFiscalYear(monthKey = state.selectedMonth) {
   });
 }
 function annualHours(monthKey = state.selectedMonth) {
-  return sumHours(sessionsForFiscalYear(monthKey));
+  const fy = fiscalYearOf(monthKey);
+  return (getSessionStatsCache().fiscalYears[fy] || 0) / 60;
 }
 
 function getLessonCount(monthKey) {
@@ -438,7 +477,11 @@ function importBackupFile(event) {
 function reloadLatestApp() {
   const ok = confirm('最新版を読み込みますか？\n\n更新前に現在の記録を端末内へ自動退避します。');
   if (!ok) return;
-  storeSafetyBackup('vt_pre_update_backup', 'before-update');
+  const saved = storeSafetyBackup('vt_pre_update_backup', 'before-update');
+  if (!saved) {
+    alert('更新前バックアップの作成に失敗しました。\n端末の空き容量を確認してから、もう一度試してください。');
+    return;
+  }
   const baseUrl = location.origin + location.pathname;
   location.href = baseUrl + '?v=' + Date.now();
 }
@@ -600,6 +643,13 @@ function registerSW() {
   });
 }
 
+function initDeferredStartupTasks() {
+  setTimeout(() => {
+    checkGoalAchievement();
+    showReportNoticeIfNeeded();
+  }, 300);
+}
+
 function initApp() {
   initPressFeedback();
   updateHeader();
@@ -607,9 +657,8 @@ function initApp() {
   updateProgress();
   updateAppInfo();
   updateMonthLabels();
-  checkGoalAchievement();
   registerSW();
-  setTimeout(showReportNoticeIfNeeded, 250);
+  initDeferredStartupTasks();
 }
 
 initApp();

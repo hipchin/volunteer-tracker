@@ -22,6 +22,7 @@ GitHub Pages上で動作し、サーバーを使用せず、端末内（localSto
 - 年次目標
 - JSONバックアップ
 - JSON復元
+- 起動時の集計キャッシュ最適化
 - PWA対応
 - ホーム画面追加対応（iPhone / Android）
 
@@ -58,6 +59,8 @@ js/
 
 PROJECT_CONTEXT.md
 README.md
+CHANGELOG.md
+TODO.md
 ```
 
 ---
@@ -69,6 +72,10 @@ README.md
 サーバーには一切保存されません。
 
 バックアップはJSON形式で保存・復元できます。
+
+既存の奉仕記録本体である `vt_sessions` のキー名は変更しません。
+
+起動高速化のため、記録データの補完完了状態を `vt_sessions_normalized_version` に保存します。これは既存記録を削除・移動するものではありません。
 
 ---
 
@@ -90,6 +97,7 @@ README.md
 - サーバーレス構成を維持
 - localStorage互換性を維持
 - 既存ユーザーデータを破壊しない
+- 起動速度改善では、既存データ形式の変更よりも読み込み・集計・描画の負荷軽減を優先する
 
 ---
 
@@ -105,6 +113,7 @@ PROJECT_CONTEXT.md
 - データ構造
 - localStorage仕様
 - PWA仕様
+- 起動高速化仕様
 - 修正時の注意事項
 
 をまとめています。
