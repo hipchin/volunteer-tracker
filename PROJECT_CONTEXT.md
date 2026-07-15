@@ -137,11 +137,13 @@ PWAとしてホーム画面追加するための設定。
 
 Service Worker。
 
-現在は本格的なオフラインキャッシュは行っていない。
+アプリシェルを端末内へ事前保存し、2回目以降の起動ではHTML・CSS・JavaScript・アイコンをキャッシュから読み込む。
 
-目的は、古いキャッシュが残り続けることを避け、更新を比較的反映しやすくすることに近い。
+画面遷移のリクエストではキャッシュ済みHTMLを即座に返し、バックグラウンドでGitHub Pages上のHTMLを取得して次回起動用に更新する。
 
-`fetch` イベントでは実質的なキャッシュ処理をしていない。
+旧キャッシュは、新しいService Workerが有効化された時点で削除する。
+
+キャッシュ削除は `volunteer-tracker-` で始まるキャッシュ名だけを対象とし、同じGitHub Pagesドメイン上の別PWAへ影響させない。
 
 ---
 
@@ -460,11 +462,15 @@ PWA表示の中心設定。
 
 ### Service Worker
 
-現在のService Workerは、強いオフラインキャッシュを行わない。
+現在のService Workerは、起動高速化とオフライン起動のためにアプリシェルをキャッシュする。
 
-古いキャッシュが残り続けることを避けるため、アクティベート時に古いキャッシュを削除する。
+キャッシュ対象は `index.html`、`manifest.json`、CSS、JavaScript、アプリアイコン。
 
-ただし、`fetch` ではキャッシュレスポンスを返していない。
+通常起動ではキャッシュ済みHTMLを先に表示し、ネットワーク上のHTMLはバックグラウンドで取得して次回起動用に保存する。
+
+CSSとJavaScriptはバージョンクエリ付きURLをキャッシュする。更新時は `index.html` のクエリと `sw.js` の `CACHE_VERSION` を同時に更新する。
+
+設定画面の「最新版を読み込む」では、安全バックアップ作成後にCache StorageとService Worker登録を解除し、キャッシュ回避URLで最新版を再取得する。
 
 ### 更新時の注意
 
@@ -554,13 +560,20 @@ iPhoneでは、Safariで開いた場合とホーム画面から開いた場合�
 - iPhone Safari
 - iPhoneホーム画面追加後のPWA
 
-### 5. Service Workerを過剰に賢くしない
+### 5. Service Workerのバージョンを必ず同期する
 
-オフライン対応を強化すると、古いHTML・CSS・JSが残る問題が起きやすい。
+アプリシェルキャッシュを使用しているため、ファイル変更時にバージョン更新を忘れると古いHTML・CSS・JavaScriptが残る可能性がある。
 
-現状は更新反映しやすさを優先した構成。
+更新時は以下を同時に変更する。
 
-オフライン対応を追加する場合は、更新導線とキャッシュ破棄の設計を先に決める。
+- `index.html` のCSS・JavaScript用クエリ
+- `js/app-version.js` の `VT_APP_BUILD`
+- `js/app-version.js` の `VT_APP_VERSION_LABEL`
+- `js/storage.js` の `APP_VERSION`
+- `sw.js` の `CACHE_VERSION`
+- `sw.js` の `APP_SHELL` 内のクエリ
+
+更新導線とキャッシュ破棄処理は削除しない。
 
 ### 6. `README.md` を現在仕様の根拠にしない
 

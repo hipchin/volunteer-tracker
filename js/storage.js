@@ -1,5 +1,5 @@
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.07.09.performance-1';
+const APP_VERSION = '2026.07.15.fast-start-1';
 const BACKUP_SCHEMA_VERSION = 2;
 const SESSION_NORMALIZED_VERSION = 2;
 

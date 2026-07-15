@@ -7,12 +7,25 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="奉仕記録">
 <meta name="theme-color" content="#f2f2f7">
+<style>
+html,body{background:#f2f2f7}
+#startup-screen{position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#f2f2f7;color:#1c1c1e;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;transition:opacity .16s ease}
+#startup-screen img{width:76px;height:76px;border-radius:17px}
+#startup-screen strong{font-size:17px;font-weight:600}
+#startup-screen span{font-size:13px;color:#8e8e93}
+body.app-ready #startup-screen{opacity:0;pointer-events:none}
+</style>
 <link rel="apple-touch-icon" sizes="180x180" href="/volunteer-tracker/apple-touch-icon-v2.png">
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="css/style.css?v=20260709-1">
+<link rel="stylesheet" href="css/style.css?v=20260715-1">
 <title>奉仕時間記録</title>
 </head>
 <body>
+<div id="startup-screen" role="status" aria-live="polite">
+  <img src="apple-touch-icon-v2.png" alt="">
+  <strong>奉仕時間記録</strong>
+  <span>起動しています</span>
+</div>
 <div class="app">
   <div id="view-record">
     <div class="header">
@@ -225,11 +238,12 @@
 <div class="notice-overlay" id="report-notice-overlay"><div class="notice-card"><div class="notice-title">📌 奉仕報告の確認</div><div class="notice-msg">先月分の奉仕報告がまだ完了していません。<br><br>集計画面で内容を確認し、<br>レッスン件数を入力してください。</div><div class="notice-actions"><button class="btn-primary btn-green" onclick="openPendingReport()">集計を開く</button><button class="btn-primary btn-gray" onclick="snoozeReportNotice()">あとで</button></div></div></div>
 <div class="goal-overlay" id="goal-overlay" onclick="hideGoalBanner()"><div class="goal-card"><div class="goal-title">🎉目標達成！</div><div class="goal-msg">よく頑張りました！<br>あなたは忠実な良い奴隷です。</div></div></div>
 
-<script src="js/storage.js?v=20260709-1"></script>
-<script src="js/time.js?v=20260709-1"></script>
-<script src="js/ui.js?v=20260709-1"></script>
-<script src="js/app.js?v=20260709-1"></script>
-<script src="js/app-version.js?v=20260709-1"></script>
-<script src="js/carryover-update.js?v=20260709-1"></script>
+<script src="js/storage.js?v=20260715-1"></script>
+<script src="js/time.js?v=20260715-1"></script>
+<script src="js/ui.js?v=20260715-1"></script>
+<script src="js/app.js?v=20260715-1"></script>
+<script src="js/app-version.js?v=20260715-1"></script>
+<script src="js/carryover-update.js?v=20260715-1"></script>
+<script>requestAnimationFrame(function(){document.body.classList.add('app-ready')});</script>
 </body>
 </html>

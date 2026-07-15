@@ -321,7 +321,11 @@
     try {
       if ('caches' in window) {
         const keys = await caches.keys();
-        await Promise.all(keys.map(key => caches.delete(key)));
+        await Promise.all(
+          keys
+            .filter(key => key.startsWith('volunteer-tracker-'))
+            .map(key => caches.delete(key))
+        );
       }
     } catch (e) {
       console.warn('Cache clear failed', e);
@@ -329,8 +333,8 @@
 
     try {
       if ('serviceWorker' in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map(reg => reg.unregister()));
+        const reg = await navigator.serviceWorker.getRegistration('./');
+        if (reg) await reg.unregister();
       }
     } catch (e) {
       console.warn('Service Worker unregister failed', e);
@@ -340,7 +344,11 @@
   async function robustReloadLatestApp() {
     const ok = confirm('最新版を読み込みますか？\n\n更新前に現在の記録を端末内へ自動退避します。');
     if (!ok) return;
-    storeSafetyBackup('vt_pre_update_backup', 'before-update');
+    const saved = storeSafetyBackup('vt_pre_update_backup', 'before-update');
+    if (!saved) {
+      alert('更新前バックアップの作成に失敗しました。\n端末の空き容量を確認してから、もう一度試してください。');
+      return;
+    }
     showToast('最新版を確認しています');
 
     await clearAppCachesAndServiceWorkers();
