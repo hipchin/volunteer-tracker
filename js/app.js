@@ -1,6 +1,6 @@
 // ==== storage.js ====
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.07.26.bundle-1';
+const APP_VERSION = '2026.07.26.update-banner-1';
 const BACKUP_SCHEMA_VERSION = 2;
 const SESSION_NORMALIZED_VERSION = 2;
 const STARTUP_PERF_KEY = 'vt_startup_perf';
@@ -459,6 +459,7 @@ function updateAppInfo() {
 }
 
 // ==== app.js ====
+var vtHadControllerAtLoad = ('serviceWorker' in navigator) && !!navigator.serviceWorker.controller;
 var state = {
   running: false,
   startTime: null,
@@ -1064,6 +1065,19 @@ function hideGoalBanner() {
   if (el) el.classList.remove('show');
 }
 
+function showUpdateBanner() {
+  const el = document.getElementById('update-banner');
+  if (el) el.classList.add('show');
+}
+function dismissUpdateBanner() {
+  const el = document.getElementById('update-banner');
+  if (el) el.classList.remove('show');
+}
+function applyUpdateNow() {
+  dismissUpdateBanner();
+  location.reload();
+}
+
 function softHaptic() {
   try { if ('vibrate' in navigator) navigator.vibrate(8); } catch (e) {}
 }
@@ -1097,6 +1111,9 @@ function initPressFeedback() {
 
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (vtHadControllerAtLoad) showUpdateBanner();
+  });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
       .then(reg => reg.update())
@@ -1131,13 +1148,14 @@ Object.assign(window, {
   exportBackup, openImportBackup, importBackupFile, reloadLatestApp,
   changeSelectedMonth, saveLessonCount, markReportDone, openPendingReport, snoozeReportNotice,
   saveGoal, saveAnnualGoal, showTab, hideGoalBanner,
+  applyUpdateNow, dismissUpdateBanner,
   deductRows
 });
 
 // ==== app-version.js ====
 // 次回以降の更新では、まずこの2つだけを変更する。
-window.VT_APP_BUILD = '20260726-1';
-window.VT_APP_VERSION_LABEL = '2026.07.26.bundle-1';
+window.VT_APP_BUILD = '20260726-2';
+window.VT_APP_VERSION_LABEL = '2026.07.26.update-banner-1';
 
 // ==== carryover-update.js ====
 // volunteer-tracker carryover + robust update patch

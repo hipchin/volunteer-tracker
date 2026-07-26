@@ -154,6 +154,13 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 .goal-card{background:#fff;border-radius:20px;padding:28px 24px;text-align:center;max-width:320px;width:100%;box-shadow:0 12px 30px rgba(0,0,0,.18);animation:goalPop .35s ease}
 .goal-title{font-size:28px;font-weight:700;margin-bottom:12px}.goal-msg{font-size:18px;line-height:1.6}
 @keyframes goalFade{from{opacity:0}to{opacity:1}}@keyframes goalPop{0%{transform:scale(.9)}70%{transform:scale(1.03)}100%{transform:scale(1)}}
+.update-banner{position:fixed;top:0;left:50%;width:100%;max-width:430px;transform:translateX(-50%) translateY(-100%);display:flex;align-items:center;justify-content:space-between;gap:12px;background:#1c1c1e;color:#fff;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top));z-index:600;box-shadow:0 2px 12px rgba(0,0,0,.18);transition:transform .2s ease}
+.update-banner.show{transform:translateX(-50%) translateY(0)}
+.update-banner span{font-size:14px}
+.update-banner .update-actions{display:flex;gap:8px;flex-shrink:0}
+.update-banner button{border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
+.update-banner .update-apply{background:#1D9E75;color:#fff}
+.update-banner .update-dismiss{background:rgba(255,255,255,.15);color:#fff}
 </style>
 <link rel="apple-touch-icon" sizes="180x180" href="/volunteer-tracker/apple-touch-icon-v2.png">
 <link rel="manifest" href="manifest.json">
@@ -375,10 +382,17 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 </nav>
 
 <div class="toast" id="toast"></div>
+<div class="update-banner" id="update-banner" role="status" aria-live="polite">
+  <span>新しいバージョンがあります</span>
+  <div class="update-actions">
+    <button type="button" class="update-apply" onclick="applyUpdateNow()">今すぐ更新</button>
+    <button type="button" class="update-dismiss" onclick="dismissUpdateBanner()">あとで</button>
+  </div>
+</div>
 <div class="notice-overlay" id="report-notice-overlay"><div class="notice-card"><div class="notice-title">📌 奉仕報告の確認</div><div class="notice-msg">先月分の奉仕報告がまだ完了していません。<br><br>集計画面で内容を確認し、<br>レッスン件数を入力してください。</div><div class="notice-actions"><button class="btn-primary btn-green" onclick="openPendingReport()">集計を開く</button><button class="btn-primary btn-gray" onclick="snoozeReportNotice()">あとで</button></div></div></div>
 <div class="goal-overlay" id="goal-overlay" onclick="hideGoalBanner()"><div class="goal-card"><div class="goal-title">🎉目標達成！</div><div class="goal-msg">よく頑張りました！<br>あなたは忠実な良い奴隷です。</div></div></div>
 
-<script src="js/app.js?v=20260726-1"></script>
+<script src="js/app.js?v=20260726-2"></script>
 <script>requestAnimationFrame(function(){document.body.classList.add('app-ready');if(typeof recordStartupPerf==='function')recordStartupPerf(performance.now());});</script>
 </body>
 </html>

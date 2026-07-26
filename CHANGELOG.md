@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 2026-07-26 - update-banner-1
+
+### Added
+
+- 新しいバージョンがバックグラウンドで取得・適用された際に「新しいバージョンがあります」バナーを表示する機能を追加。「今すぐ更新」でその場でページを再読み込みして反映、「あとで」で非表示にできる。
+- 検出方法は `navigator.serviceWorker` の `controllerchange` イベント。初回インストール時（まだ制御中のService Workerが存在しない状態からの初回制御開始）はバナーを出さないよう、ページ読み込み開始時点で既にService Workerに制御されていたかどうかを `vtHadControllerAtLoad` で判定してから表示する。
+
+### Changed
+
+- `index.html` のJSバージョンクエリ、`js/app.js` 内の `APP_VERSION` / `VT_APP_BUILD` / `VT_APP_VERSION_LABEL`、`sw.js` の `CACHE_VERSION` / `APP_SHELL` を `20260726-2` に同期。
+
 ## 2026-07-26 - bundle-1
 
 ### Added
