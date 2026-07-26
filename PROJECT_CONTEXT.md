@@ -22,17 +22,14 @@
 
 ```text
 hipchin/volunteer-tracker
-├─ index.html
+├─ index.html      (CSSはインライン化済み)
 ├─ manifest.json
 ├─ sw.js
-├─ css/
-│  └─ style.css
 └─ js/
-   ├─ storage.js
-   ├─ time.js
-   ├─ ui.js
-   └─ app.js
+   └─ app.js       (旧 storage.js / time.js / ui.js / app.js / app-version.js / carryover-update.js を統合)
 ```
+
+2026-07-26のbundle-1で、起動時のリクエスト数削減のため `css/style.css` を `index.html` の `<head>` 内へインライン化し、`js/storage.js` `js/time.js` `js/ui.js` `js/app.js` `js/app-version.js` `js/carryover-update.js` の6ファイルを単一の `js/app.js` へ統合した。旧ファイルは削除済み。統合後もファイル内部はセクション区切りコメント（`// ==== storage.js ====` など）で旧ファイル単位の役割分担を残しており、実行順序（旧読み込み順）もそのまま維持している。
 
 ### 各ファイルの役割
 
@@ -47,76 +44,20 @@ hipchin/volunteer-tracker
 - 集計
 - 設定
 
-CSSとJavaScriptは分割ファイルとして読み込まれている。
-
-読み込み順は以下。
-
-1. `js/storage.js`
-2. `js/time.js`
-3. `js/ui.js`
-4. `js/app.js`
-
-この順序は依存関係があるため、変更時に入れ替えない。
-
-#### `css/style.css`
-
-スマホ表示を中心にしたUIスタイルを定義するファイル。
-
-iPhoneのホーム画面追加後の見た目を重視しており、下部固定タブ、セーフエリア、タップ時フィードバック、カード型UIが定義されている。
-
-#### `js/storage.js`
-
-データ保存・読み込み・バックアップ作成に関する処理を担当する。
-
-主に以下を扱う。
-
-- 記録データの読み込み
-- 記録データの保存
-- 既存データ形式の補完
-- アクティブタイマーの保存・復元
-- バックアップJSONの生成
-- 更新前・復元前の安全バックアップ
-
-#### `js/time.js`
-
-日付・時刻・月・年度・表示形式に関する補助処理を担当する。
-
-重要な仕様として、年度は9月から翌8月まで。
-
-#### `js/ui.js`
-
-画面描画・タブ切り替え・履歴表示・集計表示・トースト表示などを担当する。
-
-主に以下を扱う。
-
-- 月次進捗表示
-- 履歴一覧表示
-- 集計表示
-- 年度目標表示
-- 報告状況表示
-- タブ切り替え
-- 設定画面への値反映
+CSSは `<head>` 内にインライン化済み。JavaScriptは `js/app.js` を1本だけ読み込む。
 
 #### `js/app.js`
 
-アプリ全体の状態管理と主要操作を担当する。
+旧6ファイルを統合した唯一のJavaScriptファイル。内部はセクションごとに分かれている。
 
-主に以下を扱う。
+- storage.js セクション: データ保存・読み込み・バックアップ作成・起動時間ログ（`vt_startup_perf`）を担当
+- time.js セクション: 日付・時刻・月・年度・表示形式の補助処理を担当（年度は9月から翌8月まで）
+- ui.js セクション: 画面描画・タブ切り替え・履歴表示・集計表示・トースト表示・アプリ情報表示を担当
+- app.js セクション: `state` の初期化、タイマー操作、手動入力、記録の確定・編集・削除、バックアップ書き出し・読み込み、月移動、目標保存、Service Worker登録などアプリ全体の状態管理を担当
+- app-version.js セクション: `VT_APP_BUILD` / `VT_APP_VERSION_LABEL` の一元管理
+- carryover-update.js セクション: 野外奉仕の分数繰り越しパッチ（即時実行関数でグローバルを汚染しないよう分離されている）
 
-- `state` の初期化
-- タイマー開始・終了
-- 手動入力
-- 中断時間の差し引き
-- 記録の確定
-- 記録の編集・削除
-- バックアップ書き出し・読み込み
-- 月移動
-- レッスン件数保存
-- 報告済み処理
-- 月次目標保存
-- 年次目標保存
-- 目標達成表示
-- Service Worker登録
+セクション間の実行順序（旧ファイル読み込み順）に依存関係があるため、統合ファイル内での並び順を入れ替えない。
 
 #### `manifest.json`
 
@@ -357,6 +298,14 @@ JSON配列として保存される。
 
 削除しない。
 
+### `vt_startup_perf`
+
+起動時間の診断用ログ（直近5回分、`{ at, ms }` の配列）。
+
+設定画面の「起動時間（直近）」表示にのみ使用する、純粋な診断用データ。
+
+奉仕記録そのものではないため、バックアップ書き出し・復元の対象には含めない。
+
 ---
 
 ## 記録データの形式
@@ -464,25 +413,21 @@ PWA表示の中心設定。
 
 現在のService Workerは、起動高速化とオフライン起動のためにアプリシェルをキャッシュする。
 
-キャッシュ対象は `index.html`、`manifest.json`、CSS、JavaScript、アプリアイコン。
+キャッシュ対象は `index.html`、`manifest.json`、`js/app.js`、アプリアイコン。CSSは `index.html` にインライン化済みのため個別キャッシュ対象ではない。
 
 通常起動ではキャッシュ済みHTMLを先に表示し、ネットワーク上のHTMLはバックグラウンドで取得して次回起動用に保存する。
 
-CSSとJavaScriptはバージョンクエリ付きURLをキャッシュする。更新時は `index.html` のクエリと `sw.js` の `CACHE_VERSION` を同時に更新する。
+`js/app.js` はバージョンクエリ付きURLをキャッシュする。更新時は `index.html` のクエリと `sw.js` の `CACHE_VERSION` を同時に更新する。
 
 設定画面の「最新版を読み込む」では、安全バックアップ作成後にCache StorageとService Worker登録を解除し、キャッシュ回避URLで最新版を再取得する。
 
 ### 更新時の注意
 
-CSSやJavaScriptのURLにはバージョン用クエリが付いている。
+JavaScriptのURLにはバージョン用クエリが付いている。
 
 例。
 
-- `css/style.css?v=20260629-2`
-- `js/storage.js?v=20260629-2`
-- `js/time.js?v=20260629-2`
-- `js/ui.js?v=20260629-2`
-- `js/app.js?v=20260629-2`
+- `js/app.js?v=20260726-1`
 
 ファイル修正時は、このバージョン文字列も更新する。
 
@@ -566,10 +511,10 @@ iPhoneでは、Safariで開いた場合とホーム画面から開いた場合�
 
 更新時は以下を同時に変更する。
 
-- `index.html` のCSS・JavaScript用クエリ
-- `js/app-version.js` の `VT_APP_BUILD`
-- `js/app-version.js` の `VT_APP_VERSION_LABEL`
-- `js/storage.js` の `APP_VERSION`
+- `index.html` のJavaScript用クエリ
+- `js/app.js` 内（app-version.js セクション）の `VT_APP_BUILD`
+- `js/app.js` 内（app-version.js セクション）の `VT_APP_VERSION_LABEL`
+- `js/app.js` 内（storage.js セクション）の `APP_VERSION`
 - `sw.js` の `CACHE_VERSION`
 - `sw.js` の `APP_SHELL` 内のクエリ
 

@@ -1,3 +1,464 @@
+// ==== storage.js ====
+const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
+const APP_VERSION = '2026.07.26.bundle-1';
+const BACKUP_SCHEMA_VERSION = 2;
+const SESSION_NORMALIZED_VERSION = 2;
+const STARTUP_PERF_KEY = 'vt_startup_perf';
+const STARTUP_PERF_MAX_ENTRIES = 5;
+
+function makeSessionId() {
+  return 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+}
+
+function sessionMinutes(s) {
+  if (Number.isFinite(Number(s.totalMin))) return Number(s.totalMin);
+  return Math.round((Number(s.hours) || 0) * 60);
+}
+
+function loadSessions() {
+  let sessions = [];
+  try {
+    const saved = JSON.parse(localStorage.getItem('vt_sessions') || '[]');
+    if (Array.isArray(saved)) sessions = saved;
+  } catch (e) {
+    sessions = [];
+  }
+
+  const normalizedVersion = localStorage.getItem('vt_sessions_normalized_version');
+  if (normalizedVersion === String(SESSION_NORMALIZED_VERSION)) {
+    return sessions;
+  }
+
+  let changed = false;
+  sessions = sessions.map(s => {
+    const copy = { ...s };
+    if (!copy.id) { copy.id = makeSessionId(); changed = true; }
+    if (!copy.dateKey && typeof copy.date === 'string') { copy.dateKey = copy.date.replace(/\//g, '-'); changed = true; }
+    if (!copy.month && copy.dateKey) { copy.month = dateToMonthKey(copy.dateKey); changed = true; }
+    if (!copy.date && copy.dateKey) { copy.date = copy.dateKey.replace(/-/g, '/'); changed = true; }
+    if (!copy.cat || !CAT_LABEL[copy.cat]) { copy.cat = 'main'; changed = true; }
+    if (!Number.isFinite(Number(copy.deductMin))) { copy.deductMin = 0; changed = true; }
+    if (!Number.isFinite(Number(copy.totalMin))) { copy.totalMin = sessionMinutes(copy); changed = true; }
+    if (!Number.isFinite(Number(copy.hours))) { copy.hours = copy.totalMin / 60; changed = true; }
+    copy.manual = Boolean(copy.manual);
+    copy.edited = Boolean(copy.edited);
+    return copy;
+  });
+
+  if (changed) localStorage.setItem('vt_sessions', JSON.stringify(sessions));
+  localStorage.setItem('vt_sessions_normalized_version', String(SESSION_NORMALIZED_VERSION));
+  return sessions;
+}
+
+function persistSessions() {
+  localStorage.setItem('vt_sessions', JSON.stringify(state.sessions));
+  localStorage.setItem('vt_sessions_normalized_version', String(SESSION_NORMALIZED_VERSION));
+  if (typeof invalidateSessionStatsCache === 'function') invalidateSessionStatsCache();
+}
+
+function loadMap(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || '{}');
+    return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveMap(key, value) {
+  localStorage.setItem(key, JSON.stringify(value || {}));
+}
+
+function saveActiveTimer() {
+  if (!state.running || !state.startTime) return;
+  const payload = {
+    running: true,
+    startTime: state.startTime.toISOString(),
+    category: state.category || 'main',
+    savedAt: new Date().toISOString()
+  };
+  localStorage.setItem('vt_active_timer', JSON.stringify(payload));
+}
+
+function clearActiveTimer() {
+  localStorage.removeItem('vt_active_timer');
+}
+
+function loadActiveTimer() {
+  try {
+    const raw = localStorage.getItem('vt_active_timer');
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || data.running !== true || !data.startTime) return null;
+    const start = new Date(data.startTime);
+    if (isNaN(start.getTime())) return null;
+    return { startTime: start, category: CAT_LABEL[data.category] ? data.category : 'main' };
+  } catch (e) {
+    return null;
+  }
+}
+
+function buildBackupObject(reason = 'manual') {
+  return {
+    app: 'volunteer-tracker',
+    schemaVersion: BACKUP_SCHEMA_VERSION,
+    appVersion: APP_VERSION,
+    reason,
+    exportedAt: new Date().toISOString(),
+    goal: state.goal,
+    annualGoal: state.annualGoal,
+    lessons: { ...state.lessons },
+    reported: { ...state.reported },
+    goalStatus: { ...state.goalStatus },
+    sessions: state.sessions.map(s => ({ ...s }))
+  };
+}
+
+function storeSafetyBackup(key, reason) {
+  try {
+    localStorage.setItem(key, JSON.stringify(buildBackupObject(reason)));
+    localStorage.setItem(key + '_saved_at', new Date().toISOString());
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// 起動時間の診断用ログ（記録データではないため、バックアップ対象には含めない）
+function loadStartupPerf() {
+  try {
+    const list = JSON.parse(localStorage.getItem(STARTUP_PERF_KEY) || '[]');
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function recordStartupPerf(ms) {
+  try {
+    const list = loadStartupPerf();
+    list.push({ at: new Date().toISOString(), ms: Math.round(ms) });
+    while (list.length > STARTUP_PERF_MAX_ENTRIES) list.shift();
+    localStorage.setItem(STARTUP_PERF_KEY, JSON.stringify(list));
+  } catch (e) {}
+}
+
+// ==== time.js ====
+function todayStr() {
+  const d = new Date();
+  return formatDateKeyFromDate(d);
+}
+
+function getMonthKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function dateToMonthKey(value) {
+  return String(value || '').slice(0, 7);
+}
+
+function parseMonthKey(monthKey) {
+  const [year, month] = String(monthKey).split('-').map(Number);
+  return { year, month };
+}
+
+function addMonths(monthKey, delta) {
+  const { year, month } = parseMonthKey(monthKey);
+  const d = new Date(year, month - 1 + delta, 1);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function monthLabel(monthKey) {
+  const { year, month } = parseMonthKey(monthKey);
+  return year + '年' + month + '月';
+}
+
+function monthShortLabel(monthKey) {
+  return parseMonthKey(monthKey).month + '月';
+}
+
+function fiscalYearOf(monthKey) {
+  const { year, month } = parseMonthKey(monthKey);
+  return month >= 9 ? year : year - 1;
+}
+
+function fiscalLabel(monthKey) {
+  const fy = fiscalYearOf(monthKey);
+  return fy + '年度（' + fy + '年9月〜' + (fy + 1) + '年8月）';
+}
+
+function fiscalMonthKeys(monthKey) {
+  const fy = fiscalYearOf(monthKey);
+  const keys = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(fy, 8 + i, 1);
+    keys.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'));
+  }
+  return keys;
+}
+
+function previousMonthKey() {
+  return addMonths(getMonthKey(), -1);
+}
+
+function formatDateKeyFromDate(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function isSameLocalDate(a, b) {
+  return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function fmtTime(d) {
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function parseHM(str) {
+  if (!str) return null;
+  const parts = String(str).split(':');
+  if (parts.length !== 2) return null;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return h * 60 + m;
+}
+
+function fmtHours(h) {
+  const totalMin = Math.round((Number(h) || 0) * 60);
+  const hrs = Math.floor(totalMin / 60);
+  const min = totalMin % 60;
+  if (hrs === 0) return min + '分';
+  if (min === 0) return hrs + '時間';
+  return hrs + '時間' + min + '分';
+}
+
+function fmtGoalHours(h) {
+  const num = Number(h);
+  if (!Number.isFinite(num)) return '0時間';
+  return (Number.isInteger(num) ? String(num) : String(num).replace(/\.0$/, '')) + '時間';
+}
+
+// ==== ui.js ====
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+function updateHeader() {
+  const d = new Date();
+  document.getElementById('header-month').textContent = d.getFullYear() + '年' + (d.getMonth() + 1) + '月';
+}
+
+function updateMonthLabels() {
+  const label = monthLabel(state.selectedMonth);
+  const fiscal = fiscalLabel(state.selectedMonth);
+  const pairs = [
+    ['log-title', label + 'の履歴'],
+    ['summary-title', label + 'の集計'],
+    ['log-month-label', '＜ ' + label + ' ＞'],
+    ['summary-month-label', '＜ ' + label + ' ＞'],
+    ['log-fiscal-label', fiscal],
+    ['summary-fiscal-label', fiscal]
+  ];
+  pairs.forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  });
+}
+
+function updateProgress() {
+  const total = allHours();
+  const remaining = Math.max(0, state.goal - total);
+  const pct = state.goal > 0 ? Math.min(100, Math.round(total / state.goal * 100)) : 0;
+  document.getElementById('total-display').textContent = fmtHours(total);
+  document.getElementById('goal-label').textContent = '目標 ' + fmtGoalHours(state.goal);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-remain').textContent = '残り ' + fmtHours(remaining);
+}
+
+function selectCat(cat) {
+  state.category = CAT_LABEL[cat] ? cat : 'main';
+  document.getElementById('btn-main').classList.toggle('active', state.category === 'main');
+  document.getElementById('btn-other').classList.toggle('active', state.category === 'other');
+}
+
+function updateLiveStartEditVisibility() {
+  const liveEdit = document.getElementById('live-start-edit');
+  const liveInput = document.getElementById('live-start-time');
+  if (!liveEdit || !liveInput) return;
+  if (state.running && state.startTime) {
+    liveEdit.classList.add('show');
+    liveInput.value = fmtTime(state.startTime);
+  } else {
+    liveEdit.classList.remove('show');
+  }
+}
+
+function updateLiveEndEditVisibility() {
+  const endEdit = document.getElementById('live-end-edit');
+  const endInput = document.getElementById('live-end-time');
+  if (!endEdit || !endInput) return;
+  if (!state.running && state.startTime && state.endTime) {
+    endEdit.classList.add('show');
+    endInput.value = fmtTime(state.endTime);
+  } else {
+    endEdit.classList.remove('show');
+  }
+}
+
+function updateTimerDisplay() {
+  if (!state.startTime) return;
+  const diff = Math.max(0, Math.floor((new Date() - state.startTime) / 1000));
+  const h = Math.floor(diff / 3600);
+  const m = Math.floor((diff % 3600) / 60);
+  const s = diff % 60;
+  document.getElementById('timer-display').textContent =
+    String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+}
+
+function resetTimerInputUI() {
+  clearActiveTimer();
+  state.running = false;
+  state.startTime = null;
+  state.endTime = null;
+  state.manualDate = null;
+  state.isManual = false;
+  if (state.timerInterval) clearInterval(state.timerInterval);
+  state.timerInterval = null;
+  const btn = document.getElementById('start-btn');
+  btn.style.display = 'block';
+  btn.textContent = '開始';
+  btn.className = 'btn-primary btn-green';
+  document.getElementById('timer-display').textContent = '00:00:00';
+  document.getElementById('timer-display').classList.remove('running');
+  document.getElementById('timer-label').textContent = '開始ボタンを押してください';
+  const liveEdit = document.getElementById('live-start-edit');
+  if (liveEdit) liveEdit.classList.remove('show');
+  const endEdit = document.getElementById('live-end-edit');
+  if (endEdit) endEdit.classList.remove('show');
+}
+
+function renderDeductList() {
+  const container = document.getElementById('deduct-list');
+  container.innerHTML = '';
+  deductRows.forEach((row, i) => {
+    const div = document.createElement('div');
+    div.className = 'deduct-row';
+    div.innerHTML = '<input type="time" value="' + (row.from || '') + '" onchange="deductRows[' + i + '].from=this.value">' +
+      '<span class="deduct-sep">〜</span>' +
+      '<input type="time" value="' + (row.to || '') + '" onchange="deductRows[' + i + '].to=this.value">' +
+      '<button class="deduct-del" onclick="removeDeduct(' + i + ')">×</button>';
+    container.appendChild(div);
+  });
+}
+
+function renderLog() {
+  const container = document.getElementById('log-list');
+  updateMonthLabels();
+  const sessions = selectedMonthSessions().slice().sort((a, b) => {
+    if (a.dateKey !== b.dateKey) return b.dateKey > a.dateKey ? 1 : -1;
+    if (a.start !== b.start) return b.start > a.start ? 1 : -1;
+    return String(b.id).localeCompare(String(a.id));
+  });
+  if (sessions.length === 0) {
+    container.innerHTML = '<div class="empty">記録がまだありません</div>';
+    cancelEditSession(false);
+    return;
+  }
+  container.innerHTML = '';
+  sessions.forEach(s => {
+    const div = document.createElement('div');
+    div.className = 'log-item';
+    if (s.id === editingSessionId) div.classList.add('editing');
+    const deductNote = Number(s.deductMin) > 0 ? '（-' + Number(s.deductMin) + '分）' : '';
+    const manualBadge = s.manual ? '<span class="badge badge-manual">手動</span>' : '';
+    const editedBadge = s.edited ? '<span class="badge badge-edited">編集済</span>' : '';
+    div.innerHTML = '<div class="log-left"><div class="log-date-str">' + s.date + '</div>' +
+      '<div class="log-time-str">' + s.start + ' 〜 ' + s.end + deductNote + '</div>' +
+      '<div class="log-actions"><button class="log-edit-btn" type="button">編集</button></div></div>' +
+      '<div class="log-right"><div><span class="badge badge-' + (s.cat === 'main' ? 'main' : 'other') + '">' + CAT_LABEL[s.cat] + '</span>' + manualBadge + editedBadge + '</div>' +
+      '<div class="log-hours">' + fmtHours(sessionMinutes(s) / 60) + '</div></div>';
+    div.querySelector('.log-edit-btn').addEventListener('click', () => startEditSession(s.id));
+    container.appendChild(div);
+  });
+}
+
+function renderSummary() {
+  updateMonthLabels();
+  const main = mainHours(state.selectedMonth);
+  const other = otherHours(state.selectedMonth);
+  const total = main + other;
+  const remaining = Math.max(0, state.goal - total);
+  document.getElementById('sum-total').innerHTML = fmtHours(total);
+  document.getElementById('sum-main').textContent = fmtHours(main);
+  document.getElementById('sum-other').textContent = fmtHours(other);
+  document.getElementById('sum-remain').textContent = '目標まで残り ' + fmtHours(remaining);
+
+  const annualTotal = annualHours(state.selectedMonth);
+  const annualRemaining = Math.max(0, state.annualGoal - annualTotal);
+  const annualPct = state.annualGoal > 0 ? Math.min(100, Math.round(annualTotal / state.annualGoal * 100)) : 0;
+  const annualFiscalLabel = document.getElementById('annual-fiscal-label');
+  const annualGoalLabel = document.getElementById('annual-goal-label');
+  const annualTotalEl = document.getElementById('annual-total');
+  const annualRemainEl = document.getElementById('annual-remain');
+  const annualProgressEl = document.getElementById('annual-progress-fill');
+  if (annualFiscalLabel) annualFiscalLabel.textContent = fiscalLabel(state.selectedMonth);
+  if (annualGoalLabel) annualGoalLabel.textContent = '目標 ' + fmtGoalHours(state.annualGoal);
+  if (annualTotalEl) annualTotalEl.textContent = fmtHours(annualTotal);
+  if (annualRemainEl) annualRemainEl.textContent = annualRemaining > 0 ? '年度目標まで残り ' + fmtHours(annualRemaining) : '年度目標を達成しています';
+  if (annualProgressEl) annualProgressEl.style.width = annualPct + '%';
+
+  const lessonInput = document.getElementById('lesson-input');
+  if (lessonInput) lessonInput.value = getLessonCount(state.selectedMonth);
+  const reportTitle = document.getElementById('report-title');
+  const reportSummaryText = document.getElementById('report-summary-text');
+  const reportStatus = document.getElementById('report-status');
+  const reportDoneBtn = document.getElementById('report-done-btn');
+  if (reportTitle) reportTitle.textContent = monthShortLabel(state.selectedMonth) + '奉仕報告';
+  if (reportSummaryText) reportSummaryText.textContent = reportTextForMonth(state.selectedMonth);
+  if (reportStatus) reportStatus.textContent = isReported(state.selectedMonth) ? '報告済み' : '未報告';
+  if (reportDoneBtn) reportDoneBtn.style.display = isReported(state.selectedMonth) ? 'none' : 'block';
+}
+
+function showTab(tab) {
+  ['record', 'log', 'summary', 'settings'].forEach(t => {
+    document.getElementById('view-' + t).style.display = t === tab ? 'block' : 'none';
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+  });
+  if (tab !== 'log') cancelEditSession();
+  if (tab === 'log') renderLog();
+  if (tab === 'summary') renderSummary();
+  if (tab === 'settings') {
+    document.getElementById('goal-input').value = state.goal;
+    const annualGoalInput = document.getElementById('annual-goal-input');
+    if (annualGoalInput) annualGoalInput.value = state.annualGoal;
+    updateAppInfo();
+  }
+}
+
+function updateAppInfo() {
+  const label = document.getElementById('app-version-label');
+  if (label) label.textContent = APP_VERSION;
+  const perfLabel = document.getElementById('startup-perf-label');
+  if (perfLabel) {
+    const list = loadStartupPerf();
+    if (list.length === 0) {
+      perfLabel.textContent = '計測データなし';
+    } else {
+      const latestMs = list[list.length - 1].ms;
+      const avgMs = Math.round(list.reduce((sum, e) => sum + e.ms, 0) / list.length);
+      perfLabel.textContent = latestMs + 'ms（直近' + list.length + '回平均 ' + avgMs + 'ms）';
+    }
+  }
+}
+
+// ==== app.js ====
 var state = {
   running: false,
   startTime: null,
@@ -672,3 +1133,446 @@ Object.assign(window, {
   saveGoal, saveAnnualGoal, showTab, hideGoalBanner,
   deductRows
 });
+
+// ==== app-version.js ====
+// 次回以降の更新では、まずこの2つだけを変更する。
+window.VT_APP_BUILD = '20260726-1';
+window.VT_APP_VERSION_LABEL = '2026.07.26.bundle-1';
+
+// ==== carryover-update.js ====
+// volunteer-tracker carryover + robust update patch
+// This file intentionally does not change vt_sessions.
+// Carryover rule:
+// - Do NOT carry over the current month's remainder automatically.
+// - When a month is marked as reported, only that month's main-service remainder is confirmed
+//   and carried into the next month.
+// - Other service is never carried over.
+
+(function () {
+  const CARRYOVER_ENABLED_KEY = 'vt_main_carryover_enabled';
+  const CARRYOVER_MAP_KEY = 'vt_main_carryovers';
+
+  function appBuild() {
+    return String(window.VT_APP_BUILD || 'dev');
+  }
+
+  function appVersionLabel() {
+    return String(window.VT_APP_VERSION_LABEL || (typeof APP_VERSION !== 'undefined' ? APP_VERSION : appBuild()));
+  }
+
+  function carryoverEnabled() {
+    return localStorage.getItem(CARRYOVER_ENABLED_KEY) !== 'false';
+  }
+
+  function setCarryoverEnabled(value) {
+    localStorage.setItem(CARRYOVER_ENABLED_KEY, value ? 'true' : 'false');
+  }
+
+  function loadCarryoverMap() {
+    try {
+      const value = JSON.parse(localStorage.getItem(CARRYOVER_MAP_KEY) || '{}');
+      return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function saveCarryoverMap(map) {
+    localStorage.setItem(CARRYOVER_MAP_KEY, JSON.stringify(map || {}));
+  }
+
+  function safeSessionMinutes(session) {
+    if (typeof sessionMinutes === 'function') return sessionMinutes(session);
+    if (Number.isFinite(Number(session.totalMin))) return Number(session.totalMin);
+    return Math.round((Number(session.hours) || 0) * 60);
+  }
+
+  function rawMainMinutesForMonth(monthKey) {
+    return state.sessions
+      .filter(s => s.month === monthKey && s.cat === 'main')
+      .reduce((sum, s) => sum + safeSessionMinutes(s), 0);
+  }
+
+  function rawOtherMinutesForMonth(monthKey) {
+    return state.sessions
+      .filter(s => s.month === monthKey && s.cat === 'other')
+      .reduce((sum, s) => sum + safeSessionMinutes(s), 0);
+  }
+
+  function confirmedCarryInMinutes(monthKey) {
+    if (!carryoverEnabled()) return 0;
+    const entry = loadCarryoverMap()[monthKey];
+    if (Number.isFinite(Number(entry))) return Math.max(0, parseInt(entry, 10) || 0);
+    if (entry && typeof entry === 'object' && Number.isFinite(Number(entry.minutes))) {
+      return Math.max(0, parseInt(entry.minutes, 10) || 0);
+    }
+    return 0;
+  }
+
+  function confirmedCarryOutEntry(monthKey) {
+    const nextMonth = addMonths(monthKey, 1);
+    const entry = loadCarryoverMap()[nextMonth];
+    if (!entry || typeof entry !== 'object') return null;
+    return entry.fromMonth === monthKey ? entry : null;
+  }
+
+  function hasConfirmedCarryOut(monthKey) {
+    return Boolean(confirmedCarryOutEntry(monthKey));
+  }
+
+  function baseMainTotalMinutes(monthKey) {
+    return confirmedCarryInMinutes(monthKey) + rawMainMinutesForMonth(monthKey);
+  }
+
+  function displayMainMinutesForMonth(monthKey) {
+    const total = baseMainTotalMinutes(monthKey);
+    if (!carryoverEnabled()) return rawMainMinutesForMonth(monthKey);
+
+    // If this month has already been finalized and its remainder was sent forward,
+    // show only whole-hour main-service time for this reported month.
+    if (hasConfirmedCarryOut(monthKey)) return total - (total % 60);
+
+    // Before reporting, show the actual accumulated total including confirmed carry-in.
+    return total;
+  }
+
+  function mainCarryoverInfo(monthKey) {
+    const carryInMin = confirmedCarryInMinutes(monthKey);
+    const rawMin = rawMainMinutesForMonth(monthKey);
+    const totalMin = carryInMin + rawMin;
+    const outEntry = confirmedCarryOutEntry(monthKey);
+    return {
+      enabled: carryoverEnabled(),
+      monthKey,
+      carryInMin,
+      rawMin,
+      totalMin,
+      displayMin: displayMainMinutesForMonth(monthKey),
+      carryOutMin: outEntry ? Math.max(0, parseInt(outEntry.minutes, 10) || 0) : 0,
+      carryOutConfirmed: Boolean(outEntry)
+    };
+  }
+
+  function mainHoursPatched(monthKey = getMonthKey()) {
+    return displayMainMinutesForMonth(monthKey) / 60;
+  }
+
+  function otherHoursPatched(monthKey = getMonthKey()) {
+    return rawOtherMinutesForMonth(monthKey) / 60;
+  }
+
+  function allHoursPatched(monthKey = getMonthKey()) {
+    return mainHoursPatched(monthKey) + otherHoursPatched(monthKey);
+  }
+
+  function annualHoursPatched(monthKey = state.selectedMonth) {
+    const keys = fiscalMonthKeys(monthKey);
+    const totalMin = keys.reduce((sum, key) => {
+      return sum + displayMainMinutesForMonth(key) + rawOtherMinutesForMonth(key);
+    }, 0);
+    return totalMin / 60;
+  }
+
+  function confirmCarryoverForMonth(monthKey, reason = 'reported') {
+    if (!carryoverEnabled()) return 0;
+
+    const total = baseMainTotalMinutes(monthKey);
+    const remainder = total % 60;
+    const nextMonth = addMonths(monthKey, 1);
+    const map = loadCarryoverMap();
+
+    if (remainder > 0) {
+      map[nextMonth] = {
+        fromMonth: monthKey,
+        minutes: remainder,
+        confirmedAt: new Date().toISOString(),
+        reason
+      };
+    } else {
+      const existing = map[nextMonth];
+      if (existing && typeof existing === 'object' && existing.fromMonth === monthKey) {
+        delete map[nextMonth];
+      }
+    }
+
+    saveCarryoverMap(map);
+    return remainder;
+  }
+
+  function migrateReportedCarryovers() {
+    if (!carryoverEnabled() || !state || !state.reported) return;
+
+    const map = loadCarryoverMap();
+    let changed = false;
+
+    Object.keys(state.reported)
+      .filter(monthKey => state.reported[monthKey] === true)
+      .sort()
+      .forEach(monthKey => {
+        const nextMonth = addMonths(monthKey, 1);
+        const existing = map[nextMonth];
+        const alreadyFromThisMonth = existing && typeof existing === 'object' && existing.fromMonth === monthKey;
+        if (alreadyFromThisMonth) return;
+
+        const total = confirmedCarryInMinutes(monthKey) + rawMainMinutesForMonth(monthKey);
+        const remainder = total % 60;
+
+        if (remainder > 0) {
+          map[nextMonth] = {
+            fromMonth: monthKey,
+            minutes: remainder,
+            confirmedAt: new Date().toISOString(),
+            reason: 'migration-from-reported-month'
+          };
+          changed = true;
+        }
+      });
+
+    if (changed) saveCarryoverMap(map);
+  }
+
+  function ensureCarryoverSummaryRow() {
+    if (document.getElementById('carryover-summary-row')) return;
+    const otherRow = document.getElementById('sum-other')?.closest('.summary-row');
+    if (!otherRow || !otherRow.parentNode) return;
+
+    const row = document.createElement('div');
+    row.className = 'summary-row carryover-row';
+    row.id = 'carryover-summary-row';
+    row.innerHTML = '<span class="summary-row-label">野外奉仕の繰越</span><span class="summary-row-val" id="sum-main-carryover">-</span>';
+    otherRow.insertAdjacentElement('afterend', row);
+  }
+
+  function updateCarryoverSummary() {
+    ensureCarryoverSummaryRow();
+    const el = document.getElementById('sum-main-carryover');
+    const row = document.getElementById('carryover-summary-row');
+    if (!el || !row) return;
+
+    const info = mainCarryoverInfo(state.selectedMonth);
+    if (!info.enabled) {
+      row.style.display = 'none';
+      return;
+    }
+
+    row.style.display = 'flex';
+
+    const parts = [];
+    if (info.carryInMin > 0) parts.push('前月から +' + fmtHours(info.carryInMin / 60));
+    else parts.push('前月から 0分');
+
+    if (info.carryOutConfirmed) parts.push('次月へ ' + fmtHours(info.carryOutMin / 60));
+    else parts.push('次月へ 未確定');
+
+    el.textContent = parts.join(' / ');
+  }
+
+  function ensureCarryoverSetting() {
+    if (document.getElementById('carryover-setting-row')) return;
+    const annualGoalSection = document.querySelector('#annual-goal-input')?.closest('.card');
+    if (!annualGoalSection || !annualGoalSection.parentNode) return;
+
+    const sectionHeader = document.createElement('div');
+    sectionHeader.className = 'section-header carryover-setting-header';
+    sectionHeader.textContent = '繰り越し';
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = '<div class="setting-row" id="carryover-setting-row">' +
+      '<div><div class="setting-label">野外奉仕の分数繰越</div>' +
+      '<div class="setting-desc">報告済みにした月の野外奉仕端数だけを、翌月へ繰り越します。</div></div>' +
+      '<label class="toggle-switch"><input type="checkbox" id="carryover-enabled-input"><span></span></label>' +
+      '</div>';
+
+    const hint = document.createElement('div');
+    hint.className = 'carryover-setting-note';
+    hint.textContent = 'その他の奉仕は繰り越し対象外です。記録データそのものは変更しません。';
+
+    annualGoalSection.nextElementSibling?.insertAdjacentElement('afterend', hint);
+    hint.insertAdjacentElement('beforebegin', card);
+    card.insertAdjacentElement('beforebegin', sectionHeader);
+
+    const input = document.getElementById('carryover-enabled-input');
+    if (input) {
+      input.checked = carryoverEnabled();
+      input.addEventListener('change', () => {
+        setCarryoverEnabled(input.checked);
+        if (input.checked) migrateReportedCarryovers();
+        updateProgress();
+        renderSummary();
+        checkGoalAchievement();
+        showToast(input.checked ? '分数繰越を有効にしました' : '分数繰越を無効にしました');
+      });
+    }
+  }
+
+  function patchMarkReportDone() {
+    const originalMarkReportDone = window.markReportDone;
+    window.markReportDone = function patchedMarkReportDone() {
+      const monthKey = state.selectedMonth;
+      const carryMin = confirmCarryoverForMonth(monthKey, 'mark-report-done');
+
+      if (typeof originalMarkReportDone === 'function') {
+        originalMarkReportDone();
+      } else {
+        setReported(monthKey, true);
+      }
+
+      updateProgress();
+      renderSummary();
+
+      if (carryoverEnabled() && carryMin > 0) {
+        showToast(monthLabel(monthKey) + 'を報告済みにし、' + fmtHours(carryMin / 60) + 'を翌月へ繰り越しました');
+      } else if (carryoverEnabled()) {
+        showToast(monthLabel(monthKey) + 'を報告済みにしました。繰り越し分はありません');
+      }
+    };
+    markReportDone = window.markReportDone;
+  }
+
+  function patchRenderSummary() {
+    const originalRenderSummary = window.renderSummary;
+    window.renderSummary = function patchedRenderSummary() {
+      if (typeof originalRenderSummary === 'function') originalRenderSummary();
+      updateCarryoverSummary();
+    };
+    renderSummary = window.renderSummary;
+  }
+
+  function patchShowTab() {
+    const originalShowTab = window.showTab;
+    window.showTab = function patchedShowTab(tab) {
+      if (typeof originalShowTab === 'function') originalShowTab(tab);
+      if (tab === 'settings') ensureCarryoverSetting();
+      if (tab === 'summary') updateCarryoverSummary();
+    };
+    showTab = window.showTab;
+  }
+
+  function patchReportText() {
+    window.reportTextForMonth = function patchedReportTextForMonth(monthKey) {
+      const main = mainHoursPatched(monthKey);
+      const other = otherHoursPatched(monthKey);
+      const lessons = getLessonCount(monthKey);
+      return monthShortLabel(monthKey) + '奉仕報告\n\n野外奉仕 ' + fmtHours(main) + '\nその他の奉仕 ' + fmtHours(other) + '\nレッスン ' + lessons + '件';
+    };
+    reportTextForMonth = window.reportTextForMonth;
+  }
+
+  async function clearAppCachesAndServiceWorkers() {
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(
+          keys
+            .filter(key => key.startsWith('volunteer-tracker-'))
+            .map(key => caches.delete(key))
+        );
+      }
+    } catch (e) {
+      console.warn('Cache clear failed', e);
+    }
+
+    try {
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration('./');
+        if (reg) await reg.unregister();
+      }
+    } catch (e) {
+      console.warn('Service Worker unregister failed', e);
+    }
+  }
+
+  async function robustReloadLatestApp() {
+    const ok = confirm('最新版を読み込みますか？\n\n更新前に現在の記録を端末内へ自動退避します。');
+    if (!ok) return;
+    const saved = storeSafetyBackup('vt_pre_update_backup', 'before-update');
+    if (!saved) {
+      alert('更新前バックアップの作成に失敗しました。\n端末の空き容量を確認してから、もう一度試してください。');
+      return;
+    }
+    showToast('最新版を確認しています');
+
+    await clearAppCachesAndServiceWorkers();
+
+    try {
+      await fetch('./index.html?cache-bust=' + encodeURIComponent(appBuild()) + '-' + Date.now(), {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+    } catch (e) {
+      console.warn('Fresh fetch failed', e);
+    }
+
+    const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+    location.replace(base + '?v=' + encodeURIComponent(appBuild()) + '-' + Date.now());
+  }
+
+  function injectCarryoverStyles() {
+    if (document.getElementById('carryover-patch-style')) return;
+    const style = document.createElement('style');
+    style.id = 'carryover-patch-style';
+    style.textContent = `
+      .carryover-row { background: #fbfffd; }
+      .toggle-switch { position: relative; display: inline-block; width: 52px; height: 30px; flex-shrink: 0; }
+      .toggle-switch input { opacity: 0; width: 0; height: 0; }
+      .toggle-switch span { position: absolute; cursor: pointer; inset: 0; background: #c7c7cc; border-radius: 999px; transition: .18s; }
+      .toggle-switch span:before { position: absolute; content: ''; height: 26px; width: 26px; left: 2px; bottom: 2px; background: #fff; border-radius: 50%; transition: .18s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+      .toggle-switch input:checked + span { background: #1D9E75; }
+      .toggle-switch input:checked + span:before { transform: translateX(22px); }
+      .carryover-setting-note { font-size: 13px; color: #8e8e93; padding: 8px 4px; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function patchCoreCalculations() {
+    window.rawMainHours = function rawMainHours(monthKey = getMonthKey()) {
+      return rawMainMinutesForMonth(monthKey) / 60;
+    };
+    window.mainCarryoverInfo = mainCarryoverInfo;
+    window.confirmMainCarryoverForMonth = confirmCarryoverForMonth;
+    window.mainHours = mainHoursPatched;
+    window.otherHours = otherHoursPatched;
+    window.allHours = allHoursPatched;
+    window.annualHours = annualHoursPatched;
+
+    mainHours = window.mainHours;
+    otherHours = window.otherHours;
+    allHours = window.allHours;
+    annualHours = window.annualHours;
+  }
+
+  function patchUpdateAppInfo() {
+    const originalUpdateAppInfo = window.updateAppInfo;
+    window.updateAppInfo = function patchedUpdateAppInfo() {
+      if (typeof originalUpdateAppInfo === 'function') originalUpdateAppInfo();
+      const label = document.getElementById('app-version-label');
+      if (label) label.textContent = appVersionLabel();
+    };
+    updateAppInfo = window.updateAppInfo;
+  }
+
+  function initCarryoverPatch() {
+    injectCarryoverStyles();
+    patchCoreCalculations();
+    patchUpdateAppInfo();
+    patchReportText();
+    patchMarkReportDone();
+    patchRenderSummary();
+    patchShowTab();
+    window.reloadLatestApp = robustReloadLatestApp;
+    reloadLatestApp = window.reloadLatestApp;
+
+    migrateReportedCarryovers();
+
+    updateProgress();
+    updateAppInfo();
+    if (document.getElementById('view-summary')?.style.display !== 'none') renderSummary();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCarryoverPatch);
+  } else {
+    initCarryoverPatch();
+  }
+})();

@@ -26,6 +26,7 @@ GitHub Pages上で動作し、サーバーを使用せず、端末内（localSto
 - 端末内のアプリ本体キャッシュによる高速起動
 - 初回読み込み中の起動画面表示
 - オフライン起動対応
+- 起動時間の計測・表示（設定画面）
 - PWA対応
 - ホーム画面追加対応（iPhone / Android）
 
@@ -47,18 +48,12 @@ GitHub Pages上で動作し、サーバーを使用せず、端末内（localSto
 # ディレクトリ構成
 
 ```text
-index.html
+index.html    (CSSはインライン化済み)
 manifest.json
 sw.js
 
-css/
-    style.css
-
 js/
-    storage.js
-    time.js
-    ui.js
-    app.js
+    app.js    (storage / time / ui / app / app-version / carryover-updateを統合)
 
 PROJECT_CONTEXT.md
 README.md

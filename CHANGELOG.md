@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## 2026-07-26 - bundle-1
+
+### Added
+
+- 起動時間を計測して端末内に直近5回分を記録する仕組み（`vt_startup_perf`）を追加。設定画面の「アプリ情報」に直近値と平均値を表示する。実機で体感を数値で確認できるようにするための診断用ログで、記録データではないためバックアップ対象には含めない。
+
+### Changed
+
+- `css/style.css` と `js/storage.js` / `js/time.js` / `js/ui.js` / `js/app.js` / `js/app-version.js` / `js/carryover-update.js` を、`index.html` へのインラインCSSと単一の `js/app.js` へ統合。読み込みリクエスト数を7（HTML+CSS+JS5本）から2（HTML+JS1本）へ削減し、Service Worker経由の起動時に発生していたキャッシュ照合の往復回数を減らした。
+- 各ファイルの役割分担はそのまま維持し、統合後の `js/app.js` 内にセクション区切りコメントを残した。
+- `index.html` のJSバージョンクエリ、`js/app.js` 内の `APP_VERSION` / `VT_APP_BUILD` / `VT_APP_VERSION_LABEL`、`sw.js` の `CACHE_VERSION` / `APP_SHELL` を `20260726-1` に同期。
+
+### Removed
+
+- `css/style.css`、`js/storage.js`、`js/time.js`、`js/ui.js`、`js/app-version.js`、`js/carryover-update.js` を単体ファイルとしては削除（内容は `index.html` / `js/app.js` へ統合済み）。
+
+### Note
+
+- 起動速度そのものについては、iOSのWKWebView・Service Workerのコールドスタートというアプリコード側では削減できないOS側のオーバーヘッドが体感速度の主要因になっている可能性がある。今回追加した起動時間ログで、統合前後・実機での体感差を数値で確認できるようにした。
+
 ## 2026-07-15 - fast-start-1
 
 ### Added
