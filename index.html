@@ -363,7 +363,6 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
       <div class="section-header">アプリ情報</div>
       <div class="card">
         <div class="setting-row"><span class="setting-label">現在のバージョン</span><span class="setting-value" id="app-version-label">-</span></div>
-        <div class="setting-row"><span class="setting-label">起動時間（直近）</span><span class="setting-value" id="startup-perf-label">-</span></div>
         <div class="setting-row">
           <div><div class="setting-label">最新版を読み込む</div><div class="setting-desc">GitHub Pages上の最新ファイルを再取得します。</div></div>
           <button class="setting-save" onclick="reloadLatestApp()">更新</button>
@@ -392,7 +391,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 <div class="notice-overlay" id="report-notice-overlay"><div class="notice-card"><div class="notice-title">📌 奉仕報告の確認</div><div class="notice-msg">先月分の奉仕報告がまだ完了していません。<br><br>集計画面で内容を確認し、<br>レッスン件数を入力してください。</div><div class="notice-actions"><button class="btn-primary btn-green" onclick="openPendingReport()">集計を開く</button><button class="btn-primary btn-gray" onclick="snoozeReportNotice()">あとで</button></div></div></div>
 <div class="goal-overlay" id="goal-overlay" onclick="hideGoalBanner()"><div class="goal-card"><div class="goal-title">🎉目標達成！</div><div class="goal-msg">よく頑張りました！<br>あなたは忠実な良い奴隷です。</div></div></div>
 
-<script src="js/app.js?v=20260726-2"></script>
-<script>requestAnimationFrame(function(){document.body.classList.add('app-ready');if(typeof recordStartupPerf==='function')recordStartupPerf(performance.now());});</script>
+<script src="js/app.js?v=20260726-3"></script>
+<script>requestAnimationFrame(function(){document.body.classList.add('app-ready')});</script>
 </body>
 </html>

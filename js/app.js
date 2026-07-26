@@ -1,10 +1,8 @@
 // ==== storage.js ====
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.07.26.update-banner-1';
+const APP_VERSION = '2026.07.26.no-startup-log-1';
 const BACKUP_SCHEMA_VERSION = 2;
 const SESSION_NORMALIZED_VERSION = 2;
-const STARTUP_PERF_KEY = 'vt_startup_perf';
-const STARTUP_PERF_MAX_ENTRIES = 5;
 
 function makeSessionId() {
   return 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
@@ -122,25 +120,6 @@ function storeSafetyBackup(key, reason) {
   } catch (e) {
     return false;
   }
-}
-
-// 起動時間の診断用ログ（記録データではないため、バックアップ対象には含めない）
-function loadStartupPerf() {
-  try {
-    const list = JSON.parse(localStorage.getItem(STARTUP_PERF_KEY) || '[]');
-    return Array.isArray(list) ? list : [];
-  } catch (e) {
-    return [];
-  }
-}
-
-function recordStartupPerf(ms) {
-  try {
-    const list = loadStartupPerf();
-    list.push({ at: new Date().toISOString(), ms: Math.round(ms) });
-    while (list.length > STARTUP_PERF_MAX_ENTRIES) list.shift();
-    localStorage.setItem(STARTUP_PERF_KEY, JSON.stringify(list));
-  } catch (e) {}
 }
 
 // ==== time.js ====
@@ -445,17 +424,6 @@ function showTab(tab) {
 function updateAppInfo() {
   const label = document.getElementById('app-version-label');
   if (label) label.textContent = APP_VERSION;
-  const perfLabel = document.getElementById('startup-perf-label');
-  if (perfLabel) {
-    const list = loadStartupPerf();
-    if (list.length === 0) {
-      perfLabel.textContent = '計測データなし';
-    } else {
-      const latestMs = list[list.length - 1].ms;
-      const avgMs = Math.round(list.reduce((sum, e) => sum + e.ms, 0) / list.length);
-      perfLabel.textContent = latestMs + 'ms（直近' + list.length + '回平均 ' + avgMs + 'ms）';
-    }
-  }
 }
 
 // ==== app.js ====
@@ -1154,8 +1122,8 @@ Object.assign(window, {
 
 // ==== app-version.js ====
 // 次回以降の更新では、まずこの2つだけを変更する。
-window.VT_APP_BUILD = '20260726-2';
-window.VT_APP_VERSION_LABEL = '2026.07.26.update-banner-1';
+window.VT_APP_BUILD = '20260726-3';
+window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
 
 // ==== carryover-update.js ====
 // volunteer-tracker carryover + robust update patch

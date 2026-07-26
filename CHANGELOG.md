@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 2026-07-26 - no-startup-log-1
+
+### Removed
+
+- 起動時間の実測ログ表示機能を削除。設定画面の「起動時間（直近）」項目、`recordStartupPerf` / `loadStartupPerf`、起動完了時の計測呼び出しを撤去。不要と判断したため。
+- `vt_startup_perf` への書き込みは停止。既存端末に残っている可能性のある `vt_startup_perf` キー自体は無害な診断データのため、能動的な削除は行わない（削除しない、というルールに従う）。
+
+### Changed
+
+- `index.html` のJSバージョンクエリ、`js/app.js` 内の `APP_VERSION` / `VT_APP_BUILD` / `VT_APP_VERSION_LABEL`、`sw.js` の `CACHE_VERSION` / `APP_SHELL` を `20260726-3` に同期。
+
 ## 2026-07-26 - update-banner-1
 
 ### Added
