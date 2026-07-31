@@ -27,16 +27,26 @@ jobs:
 
       - name: バージョン文字列を自動更新
         run: |
-          VERSION=$(TZ='Asia/Tokyo' date '+%Y.%m.%d')
-          COUNT=$(grep -o "const APP_VERSION = '$VERSION\.[0-9]*'" volunteer_tracker.html | grep -o '\.[0-9]*$' | tail -1 | tr -d '.')
-          if [ -z "$COUNT" ]; then
-            PATCH=1
+          BUILD_DATE=$(TZ='Asia/Tokyo' date '+%Y%m%d')
+          LABEL_DATE=$(TZ='Asia/Tokyo' date '+%Y.%m.%d')
+          OLD_BUILD=$(grep -oP "(?<=VT_APP_BUILD = ')[^']*" js/app.js)
+          OLD_BUILD_DATE="${OLD_BUILD%-*}"
+          OLD_SEQ="${OLD_BUILD##*-}"
+          if [ "$OLD_BUILD_DATE" = "$BUILD_DATE" ]; then
+            NEW_SEQ=$((OLD_SEQ + 1))
           else
-            PATCH=$((COUNT + 1))
+            NEW_SEQ=1
           fi
-          NEW_VERSION="${VERSION}.${PATCH}"
-          sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '$NEW_VERSION'/" volunteer_tracker.html
-          echo "Version: $NEW_VERSION"
+          NEW_BUILD="${BUILD_DATE}-${NEW_SEQ}"
+          NEW_LABEL="${LABEL_DATE}.${NEW_SEQ}"
+
+          sed -i "s/const APP_VERSION = '[^']*'/const APP_VERSION = '${NEW_LABEL}'/" js/app.js
+          sed -i "s/window.VT_APP_BUILD = '[^']*'/window.VT_APP_BUILD = '${NEW_BUILD}'/" js/app.js
+          sed -i "s/window.VT_APP_VERSION_LABEL = '[^']*'/window.VT_APP_VERSION_LABEL = '${NEW_LABEL}'/" js/app.js
+          sed -i "s/${OLD_BUILD}/${NEW_BUILD}/g" sw.js
+          sed -i "s/${OLD_BUILD}/${NEW_BUILD}/g" index.html
+
+          echo "Build: $OLD_BUILD -> $NEW_BUILD (label: $NEW_LABEL)"
 
       - name: GitHub Pages用にセットアップ
         uses: actions/configure-pages@v5
