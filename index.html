@@ -9,11 +9,27 @@
 <meta name="theme-color" content="#f2f2f7">
 <style>
 html,body{background:#f2f2f7}
-#startup-screen{position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#f2f2f7;color:#1c1c1e;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;transition:opacity .16s ease}
-#startup-screen img{width:76px;height:76px;border-radius:17px}
-#startup-screen strong{font-size:17px;font-weight:600}
-#startup-screen span{font-size:13px;color:#8e8e93}
+#startup-screen{position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:#f2f2f7;color:#1c1c1e;font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;transition:opacity .16s ease}
+#startup-screen .scene{width:180px}
+#startup-screen svg{width:100%;height:auto;display:block;overflow:visible}
+#startup-screen .ground-line{stroke:#c6c6c8;stroke-width:2;stroke-linecap:round;stroke-dasharray:5 11;animation:vt-ground-scroll .75s linear infinite}
+@keyframes vt-ground-scroll{to{stroke-dashoffset:-16}}
+#startup-screen .bob{animation:vt-bob .75s ease-in-out infinite;transform-origin:0 0}
+@keyframes vt-bob{0%,100%{transform:translateY(0)}25%,75%{transform:translateY(-2.5px)}50%{transform:translateY(0)}}
+#startup-screen .swing-a{animation:vt-swing-a .75s ease-in-out infinite;transform-origin:0 0}
+#startup-screen .swing-b{animation:vt-swing-b .75s ease-in-out infinite;transform-origin:0 0}
+@keyframes vt-swing-a{0%,100%{transform:rotate(-24deg)}50%{transform:rotate(24deg)}}
+@keyframes vt-swing-b{0%,100%{transform:rotate(24deg)}50%{transform:rotate(-24deg)}}
+#startup-screen .shadow{animation:vt-shadow-pulse .75s ease-in-out infinite;transform-origin:90px 138px}
+@keyframes vt-shadow-pulse{0%,100%{opacity:.16;transform:scaleX(1)}50%{opacity:.1;transform:scaleX(.82)}}
+#startup-screen .status{display:flex;align-items:baseline;gap:2px;font-size:13px;color:#8e8e93;letter-spacing:.02em}
+#startup-screen .status .dot{animation:vt-dot-fade 1.2s ease-in-out infinite}
+#startup-screen .status .dot:nth-child(2){animation-delay:.2s}
+#startup-screen .status .dot:nth-child(3){animation-delay:.4s}
+#startup-screen .status .dot:nth-child(4){animation-delay:.6s}
+@keyframes vt-dot-fade{0%,60%,100%{opacity:.2}30%{opacity:1}}
 body.app-ready #startup-screen{opacity:0;pointer-events:none}
+@media (prefers-reduced-motion:reduce){#startup-screen .ground-line,#startup-screen .bob,#startup-screen .swing-a,#startup-screen .swing-b,#startup-screen .shadow,#startup-screen .status .dot{animation:none}}
 </style>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -167,10 +183,53 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 <title>奉仕時間記録</title>
 </head>
 <body>
-<div id="startup-screen" role="status" aria-live="polite">
-  <img src="apple-touch-icon-v2.png" alt="">
-  <strong>奉仕時間記録</strong>
-  <span>起動しています</span>
+<div id="startup-screen" role="status" aria-live="polite" aria-label="読み込み中">
+  <div class="scene">
+    <svg viewBox="0 0 260 150">
+      <line class="ground-line" x1="4" y1="138" x2="256" y2="138"></line>
+      <g transform="translate(196,138)">
+        <rect x="-24" y="-37" width="48" height="37" fill="#e4ded0" rx="2"></rect>
+        <polygon points="-30,-37 0,-62 30,-37" fill="#b5573a"></polygon>
+        <rect x="-6" y="-18" width="12" height="18" fill="#1D9E75" rx="1.5"></rect>
+        <rect x="-16" y="-30" width="9" height="9" fill="#f2f2f7" rx="1"></rect>
+        <rect x="7" y="-30" width="9" height="9" fill="#f2f2f7" rx="1"></rect>
+      </g>
+      <ellipse class="shadow" cx="90" cy="138" rx="20" ry="4" fill="#000"></ellipse>
+      <g transform="translate(90,138)">
+        <g class="bob">
+          <g transform="translate(-7,-74)">
+            <g class="swing-b">
+              <rect x="-4" y="0" width="8" height="24" rx="4" fill="#1D9E75"></rect>
+            </g>
+          </g>
+          <g transform="translate(1,-48)">
+            <g class="swing-b">
+              <rect x="-5" y="0" width="10" height="42" rx="4.5" fill="#3d4a5c"></rect>
+              <ellipse cx="0" cy="42" rx="6.5" ry="3" fill="#22282f"></ellipse>
+            </g>
+          </g>
+          <g transform="translate(-7,-48)">
+            <g class="swing-a">
+              <rect x="-5" y="0" width="10" height="42" rx="4.5" fill="#3d4a5c"></rect>
+              <ellipse cx="0" cy="42" rx="6.5" ry="3" fill="#22282f"></ellipse>
+            </g>
+          </g>
+          <rect x="-11" y="-78" width="22" height="30" rx="9" fill="#1D9E75"></rect>
+          <circle cx="0" cy="-96" r="13" fill="#f0b189"></circle>
+          <path d="M-13,-98 Q-13,-112 0,-112 Q13,-112 13,-98 L13,-93 Q0,-101 -13,-93 Z" fill="#3a2c22"></path>
+          <circle cx="-4.5" cy="-95" r="1.4" fill="#3a2c22"></circle>
+          <circle cx="4.5" cy="-95" r="1.4" fill="#3a2c22"></circle>
+          <path d="M-4,-89 Q0,-86 4,-89" stroke="#3a2c22" stroke-width="1.3" fill="none" stroke-linecap="round"></path>
+          <g transform="translate(7,-74)">
+            <g class="swing-a">
+              <rect x="-4" y="0" width="8" height="24" rx="4" fill="#f0b189"></rect>
+            </g>
+          </g>
+        </g>
+      </g>
+    </svg>
+  </div>
+  <div class="status">Loading<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
 </div>
 <div class="app">
   <div id="view-record">
