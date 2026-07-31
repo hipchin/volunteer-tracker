@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+<script>window.__vtStartupShownAt=Date.now();</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -451,6 +452,15 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 <div class="goal-overlay" id="goal-overlay" onclick="hideGoalBanner()"><div class="goal-card"><div class="goal-title">🎉目標達成！</div><div class="goal-msg">よく頑張りました！<br>あなたは忠実な良い奴隷です。</div></div></div>
 
 <script src="js/app.js?v=20260726-3"></script>
-<script>requestAnimationFrame(function(){document.body.classList.add('app-ready')});</script>
+<script>
+(function(){
+  var MIN_STARTUP_DISPLAY_MS = 650;
+  var elapsed = Date.now() - (window.__vtStartupShownAt || Date.now());
+  var wait = Math.max(0, MIN_STARTUP_DISPLAY_MS - elapsed);
+  setTimeout(function(){
+    requestAnimationFrame(function(){ document.body.classList.add('app-ready'); });
+  }, wait);
+})();
+</script>
 </body>
 </html>
