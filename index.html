@@ -454,7 +454,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 <script src="js/app.js?v=20260726-3"></script>
 <script>
 (function(){
-  var MIN_STARTUP_DISPLAY_MS = 650;
+  var MIN_STARTUP_DISPLAY_MS = 1300;
   var elapsed = Date.now() - (window.__vtStartupShownAt || Date.now());
   var wait = Math.max(0, MIN_STARTUP_DISPLAY_MS - elapsed);
   setTimeout(function(){
