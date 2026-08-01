@@ -1129,13 +1129,12 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
 // volunteer-tracker carryover + robust update patch
 // This file intentionally does not change vt_sessions.
 // Carryover rule:
-// - A month's carry-out to the next month is based on that month's OWN raw main-service
-//   remainder only (never including whatever carried into it from the month before).
-// - A month's carry-in is added to its own total/display and to its first main-service
-//   session, but is spent there: it does not chain into what that month carries onward.
-//   Per reporting rules, a remainder can only ever be carried into the immediately next
-//   month, not further.
-// - Other service is never carried over.
+// - A month's carry-out to the next month is the sub-hour remainder of that month's OWN
+//   raw total (main + other service), never including whatever carried into it from the
+//   month before.
+// - A month's carry-in is added to its own total/display and to its first session, but is
+//   spent there: it does not chain into what that month carries onward. Per reporting
+//   rules, a remainder can only ever be carried into the immediately next month.
 
 (function () {
   const CARRYOVER_ENABLED_KEY = 'vt_main_carryover_enabled';
@@ -1209,30 +1208,43 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     return Boolean(confirmedCarryOutEntry(monthKey));
   }
 
-  function baseMainTotalMinutes(monthKey) {
-    return confirmedCarryInMinutes(monthKey) + rawMainMinutesForMonth(monthKey);
+  function rawTotalMinutesForMonth(monthKey) {
+    return rawMainMinutesForMonth(monthKey) + rawOtherMinutesForMonth(monthKey);
   }
 
-  // Full total for this month's own display/goal progress: always includes confirmed
-  // carry-in and any not-yet-carried-out remainder, so a month's own total (and whether
-  // it hit its goal) reflects everything actually worked in it.
+  // The carry-in lands on the month's first session, so it counts under whichever
+  // category that session belongs to. With no sessions yet it still has to show up
+  // somewhere, so it falls back to main service.
+  function carryInCategory(monthKey) {
+    const first = firstSessionOfMonth(monthKey);
+    return first && first.cat === 'other' ? 'other' : 'main';
+  }
+
+  // Per-category totals for this month's own display/goal progress: they include the
+  // confirmed carry-in and any not-yet-carried-out remainder, so a month's own total
+  // (and whether it hit its goal) reflects everything actually worked in it.
   function displayMainMinutesForMonth(monthKey) {
-    if (!carryoverEnabled()) return rawMainMinutesForMonth(monthKey);
-    return baseMainTotalMinutes(monthKey);
+    const raw = rawMainMinutesForMonth(monthKey);
+    if (!carryoverEnabled() || carryInCategory(monthKey) !== 'main') return raw;
+    return raw + confirmedCarryInMinutes(monthKey);
+  }
+
+  function displayOtherMinutesForMonth(monthKey) {
+    const raw = rawOtherMinutesForMonth(monthKey);
+    if (!carryoverEnabled() || carryInCategory(monthKey) !== 'other') return raw;
+    return raw + confirmedCarryInMinutes(monthKey);
   }
 
   function mainCarryoverInfo(monthKey) {
     const carryInMin = confirmedCarryInMinutes(monthKey);
-    const rawMin = rawMainMinutesForMonth(monthKey);
-    const totalMin = carryInMin + rawMin;
+    const rawMin = rawTotalMinutesForMonth(monthKey);
     const outEntry = confirmedCarryOutEntry(monthKey);
     return {
       enabled: carryoverEnabled(),
       monthKey,
       carryInMin,
       rawMin,
-      totalMin,
-      displayMin: displayMainMinutesForMonth(monthKey),
+      totalMin: carryInMin + rawMin,
       carryOutMin: outEntry ? Math.max(0, parseInt(outEntry.minutes, 10) || 0) : 0,
       carryOutConfirmed: Boolean(outEntry)
     };
@@ -1243,7 +1255,7 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
   }
 
   function otherHoursPatched(monthKey = getMonthKey()) {
-    return rawOtherMinutesForMonth(monthKey) / 60;
+    return displayOtherMinutesForMonth(monthKey) / 60;
   }
 
   function allHoursPatched(monthKey = getMonthKey()) {
@@ -1264,9 +1276,10 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
   function confirmCarryoverForMonth(monthKey, reason = 'reported') {
     if (!carryoverEnabled()) return 0;
 
-    // Only this month's own raw remainder carries forward — a carry-in it received from
-    // the month before is not passed along again (carries only one month, per reporting rules).
-    const remainder = rawMainMinutesForMonth(monthKey) % 60;
+    // Only this month's own raw total remainder carries forward — a carry-in it received
+    // from the month before is not passed along again (carries only one month, per
+    // reporting rules).
+    const remainder = rawTotalMinutesForMonth(monthKey) % 60;
     const nextMonth = addMonths(monthKey, 1);
     const map = loadCarryoverMap();
 
@@ -1288,16 +1301,16 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     return remainder;
   }
 
-  function earliestMainMonthKey() {
-    const mains = state.sessions.filter(s => s.cat === 'main' && s.month);
-    if (!mains.length) return null;
-    return mains.map(s => s.month).sort()[0];
+  function earliestSessionMonthKey() {
+    const months = state.sessions.filter(s => s.month).map(s => s.month);
+    if (!months.length) return null;
+    return months.sort()[0];
   }
 
   function autoConfirmElapsedMonths() {
     if (!carryoverEnabled() || !state) return;
     const current = getMonthKey();
-    const start = earliestMainMonthKey();
+    const start = earliestSessionMonthKey();
     if (!start || start >= current) return;
     let cursor = start;
     let guard = 0;
@@ -1308,8 +1321,8 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     }
   }
 
-  function firstMainSessionOfMonth(monthKey) {
-    const mains = state.sessions.filter(s => s.month === monthKey && s.cat === 'main');
+  function firstSessionOfMonth(monthKey) {
+    const mains = state.sessions.filter(s => s.month === monthKey);
     if (!mains.length) return null;
     return mains.slice().sort((a, b) => {
       if (a.dateKey !== b.dateKey) return a.dateKey < b.dateKey ? -1 : 1;
@@ -1326,7 +1339,7 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     const row = document.createElement('div');
     row.className = 'summary-row carryover-row';
     row.id = 'carryover-summary-row';
-    row.innerHTML = '<span class="summary-row-label">野外奉仕の繰越</span><span class="summary-row-val" id="sum-main-carryover">-</span>';
+    row.innerHTML = '<span class="summary-row-label">分数の繰越</span><span class="summary-row-val" id="sum-main-carryover">-</span>';
     otherRow.insertAdjacentElement('afterend', row);
   }
 
@@ -1348,8 +1361,13 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     if (info.carryInMin > 0) parts.push('前月から +' + fmtHours(info.carryInMin / 60));
     else parts.push('前月から 0分');
 
-    if (info.carryOutConfirmed) parts.push('次月へ ' + fmtHours(info.carryOutMin / 60));
-    else parts.push('次月へ 未確定');
+    // A past month's carry-out is settled even when it came out to zero; only the month
+    // still in progress is genuinely undecided.
+    if (info.carryOutConfirmed || info.monthKey < getMonthKey()) {
+      parts.push('次月へ ' + fmtHours(info.carryOutMin / 60));
+    } else {
+      parts.push('次月へ 未確定');
+    }
 
     el.textContent = parts.join(' / ');
   }
@@ -1366,14 +1384,14 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = '<div class="setting-row" id="carryover-setting-row">' +
-      '<div><div class="setting-label">野外奉仕の分数繰越</div>' +
-      '<div class="setting-desc">報告済みにした月の野外奉仕端数だけを、翌月へ繰り越します。</div></div>' +
+      '<div><div class="setting-label">分数の繰越</div>' +
+      '<div class="setting-desc">合計時間の1時間未満の端数を、翌月の最初の記録へ繰り越します。</div></div>' +
       '<label class="toggle-switch"><input type="checkbox" id="carryover-enabled-input"><span></span></label>' +
       '</div>';
 
     const hint = document.createElement('div');
     hint.className = 'carryover-setting-note';
-    hint.textContent = 'その他の奉仕は繰り越し対象外です。記録データそのものは変更しません。';
+    hint.textContent = '繰り越せるのは翌月までです。記録データそのものは変更しません。';
 
     annualGoalSection.nextElementSibling?.insertAdjacentElement('afterend', hint);
     hint.insertAdjacentElement('beforebegin', card);
@@ -1443,7 +1461,7 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
       }
 
       const carryInMin = carryoverEnabled() ? confirmedCarryInMinutes(monthKey) : 0;
-      const carryTarget = carryInMin > 0 ? firstMainSessionOfMonth(monthKey) : null;
+      const carryTarget = carryInMin > 0 ? firstSessionOfMonth(monthKey) : null;
 
       container.innerHTML = '';
       sessions.forEach(s => {
