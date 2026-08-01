@@ -1285,6 +1285,36 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     return remainder;
   }
 
+  function earliestMainMonthKey() {
+    const mains = state.sessions.filter(s => s.cat === 'main' && s.month);
+    if (!mains.length) return null;
+    return mains.map(s => s.month).sort()[0];
+  }
+
+  function autoConfirmElapsedMonths() {
+    if (!carryoverEnabled() || !state) return;
+    const current = getMonthKey();
+    const start = earliestMainMonthKey();
+    if (!start || start >= current) return;
+    let cursor = start;
+    let guard = 0;
+    while (cursor < current && guard < 2400) {
+      confirmCarryoverForMonth(cursor, 'auto-month-end');
+      cursor = addMonths(cursor, 1);
+      guard++;
+    }
+  }
+
+  function firstMainSessionOfMonth(monthKey) {
+    const mains = state.sessions.filter(s => s.month === monthKey && s.cat === 'main');
+    if (!mains.length) return null;
+    return mains.slice().sort((a, b) => {
+      if (a.dateKey !== b.dateKey) return a.dateKey < b.dateKey ? -1 : 1;
+      if (a.start !== b.start) return a.start < b.start ? -1 : 1;
+      return String(a.id).localeCompare(String(b.id));
+    })[0];
+  }
+
   function migrateReportedCarryovers() {
     if (!carryoverEnabled() || !state || !state.reported) return;
 
@@ -1425,6 +1455,48 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     renderSummary = window.renderSummary;
   }
 
+  function patchRenderLog() {
+    window.renderLog = function renderLogWithCarryover() {
+      const container = document.getElementById('log-list');
+      updateMonthLabels();
+      const monthKey = state.selectedMonth;
+      const sessions = selectedMonthSessions().slice().sort((a, b) => {
+        if (a.dateKey !== b.dateKey) return b.dateKey > a.dateKey ? 1 : -1;
+        if (a.start !== b.start) return b.start > a.start ? 1 : -1;
+        return String(b.id).localeCompare(String(a.id));
+      });
+      if (sessions.length === 0) {
+        container.innerHTML = '<div class="empty">記録がまだありません</div>';
+        cancelEditSession(false);
+        return;
+      }
+
+      const carryInMin = carryoverEnabled() ? confirmedCarryInMinutes(monthKey) : 0;
+      const carryTarget = carryInMin > 0 ? firstMainSessionOfMonth(monthKey) : null;
+
+      container.innerHTML = '';
+      sessions.forEach(s => {
+        const div = document.createElement('div');
+        div.className = 'log-item';
+        if (s.id === editingSessionId) div.classList.add('editing');
+        const deductNote = Number(s.deductMin) > 0 ? '（-' + Number(s.deductMin) + '分）' : '';
+        const manualBadge = s.manual ? '<span class="badge badge-manual">手動</span>' : '';
+        const editedBadge = s.edited ? '<span class="badge badge-edited">編集済</span>' : '';
+        const isCarryTarget = Boolean(carryTarget) && s.id === carryTarget.id;
+        const carryBadge = isCarryTarget ? '<span class="badge badge-carryover">前月繰越+' + fmtHours(carryInMin / 60) + '</span>' : '';
+        const displayMin = sessionMinutes(s) + (isCarryTarget ? carryInMin : 0);
+        div.innerHTML = '<div class="log-left"><div class="log-date-str">' + s.date + '</div>' +
+          '<div class="log-time-str">' + s.start + ' 〜 ' + s.end + deductNote + '</div>' +
+          '<div class="log-actions"><button class="log-edit-btn" type="button">編集</button></div></div>' +
+          '<div class="log-right"><div><span class="badge badge-' + (s.cat === 'main' ? 'main' : 'other') + '">' + CAT_LABEL[s.cat] + '</span>' + manualBadge + editedBadge + carryBadge + '</div>' +
+          '<div class="log-hours">' + fmtHours(displayMin / 60) + '</div></div>';
+        div.querySelector('.log-edit-btn').addEventListener('click', () => startEditSession(s.id));
+        container.appendChild(div);
+      });
+    };
+    renderLog = window.renderLog;
+  }
+
   function patchShowTab() {
     const originalShowTab = window.showTab;
     window.showTab = function patchedShowTab(tab) {
@@ -1507,6 +1579,7 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
       .toggle-switch input:checked + span { background: #1D9E75; }
       .toggle-switch input:checked + span:before { transform: translateX(22px); }
       .carryover-setting-note { font-size: 13px; color: #8e8e93; padding: 8px 4px; }
+      .badge-carryover { background: #d1f0e7; color: #0f6e56; margin-left: 4px; }
     `;
     document.head.appendChild(style);
   }
@@ -1545,15 +1618,18 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     patchReportText();
     patchMarkReportDone();
     patchRenderSummary();
+    patchRenderLog();
     patchShowTab();
     window.reloadLatestApp = robustReloadLatestApp;
     reloadLatestApp = window.reloadLatestApp;
 
+    autoConfirmElapsedMonths();
     migrateReportedCarryovers();
 
     updateProgress();
     updateAppInfo();
     if (document.getElementById('view-summary')?.style.display !== 'none') renderSummary();
+    if (document.getElementById('view-log')?.style.display !== 'none') renderLog();
   }
 
   if (document.readyState === 'loading') {
