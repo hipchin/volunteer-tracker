@@ -1129,16 +1129,21 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
 // volunteer-tracker carryover + robust update patch
 // This file intentionally does not change vt_sessions.
 // Carryover rule:
-// - A month's carry-out to the next month is the sub-hour remainder of that month's OWN
-//   raw total (main + other service), never including whatever carried into it from the
-//   month before.
-// - A month's carry-in is added to its own total/display and to its first session, but is
-//   spent there: it does not chain into what that month carries onward. Per reporting
-//   rules, a remainder can only ever be carried into the immediately next month.
+// - Other service can never carry its remainder into the next month, and its remainder may
+//   not be pooled with the main-service remainder to make up an hour. Each month you choose
+//   what happens to the other-service remainder: merge it into main service, or drop it.
+//   Either way other service itself is reported in whole hours.
+// - A month's carry-out is the sub-hour remainder of its own main-service minutes (plus the
+//   other-service remainder when merged), never including whatever carried into it from the
+//   month before. Per reporting rules, a remainder can only ever be carried into the
+//   immediately next month.
+// - Until a month's other-service remainder choice is made, that month carries nothing
+//   forward: the amount isn't determined yet.
 
 (function () {
   const CARRYOVER_ENABLED_KEY = 'vt_main_carryover_enabled';
   const CARRYOVER_MAP_KEY = 'vt_main_carryovers';
+  const OTHER_MODE_MAP_KEY = 'vt_other_remainder_modes';
 
   function appBuild() {
     return String(window.VT_APP_BUILD || 'dev');
@@ -1167,6 +1172,28 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
 
   function saveCarryoverMap(map) {
     localStorage.setItem(CARRYOVER_MAP_KEY, JSON.stringify(map || {}));
+  }
+
+  function loadOtherModeMap() {
+    try {
+      const value = JSON.parse(localStorage.getItem(OTHER_MODE_MAP_KEY) || '{}');
+      return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  // 'merge' | 'discard' | null (not decided yet)
+  function otherRemainderMode(monthKey) {
+    const value = loadOtherModeMap()[monthKey];
+    return value === 'merge' || value === 'discard' ? value : null;
+  }
+
+  function setOtherRemainderMode(monthKey, mode) {
+    const map = loadOtherModeMap();
+    if (mode === 'merge' || mode === 'discard') map[monthKey] = mode;
+    else delete map[monthKey];
+    localStorage.setItem(OTHER_MODE_MAP_KEY, JSON.stringify(map));
   }
 
   function safeSessionMinutes(session) {
@@ -1208,36 +1235,39 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     return Boolean(confirmedCarryOutEntry(monthKey));
   }
 
-  function rawTotalMinutesForMonth(monthKey) {
-    return rawMainMinutesForMonth(monthKey) + rawOtherMinutesForMonth(monthKey);
+  function otherRemainderMinutes(monthKey) {
+    return rawOtherMinutesForMonth(monthKey) % 60;
   }
 
-  // The carry-in lands on the month's first session, so it counts under whichever
-  // category that session belongs to. With no sessions yet it still has to show up
-  // somewhere, so it falls back to main service.
-  function carryInCategory(monthKey) {
-    const first = firstSessionOfMonth(monthKey);
-    return first && first.cat === 'other' ? 'other' : 'main';
+  // Other service has a sub-hour remainder but no decision on it yet, so this month's
+  // figures can't be finalized.
+  function needsOtherModeChoice(monthKey) {
+    if (!carryoverEnabled()) return false;
+    return otherRemainderMinutes(monthKey) > 0 && !otherRemainderMode(monthKey);
   }
 
   // Per-category totals for this month's own display/goal progress: they include the
   // confirmed carry-in and any not-yet-carried-out remainder, so a month's own total
-  // (and whether it hit its goal) reflects everything actually worked in it.
+  // (and whether it hit its goal) reflects everything actually worked in it. The
+  // carry-in is always main-service time — other service never receives a carryover.
   function displayMainMinutesForMonth(monthKey) {
     const raw = rawMainMinutesForMonth(monthKey);
-    if (!carryoverEnabled() || carryInCategory(monthKey) !== 'main') return raw;
-    return raw + confirmedCarryInMinutes(monthKey);
+    if (!carryoverEnabled()) return raw;
+    const merged = otherRemainderMode(monthKey) === 'merge' ? otherRemainderMinutes(monthKey) : 0;
+    return raw + confirmedCarryInMinutes(monthKey) + merged;
   }
 
+  // Once decided, other service is reported in whole hours either way: the remainder has
+  // moved into main service (merge) or been dropped (discard).
   function displayOtherMinutesForMonth(monthKey) {
     const raw = rawOtherMinutesForMonth(monthKey);
-    if (!carryoverEnabled() || carryInCategory(monthKey) !== 'other') return raw;
-    return raw + confirmedCarryInMinutes(monthKey);
+    if (!carryoverEnabled() || !otherRemainderMode(monthKey)) return raw;
+    return raw - otherRemainderMinutes(monthKey);
   }
 
   function mainCarryoverInfo(monthKey) {
     const carryInMin = confirmedCarryInMinutes(monthKey);
-    const rawMin = rawTotalMinutesForMonth(monthKey);
+    const rawMin = rawMainMinutesForMonth(monthKey);
     const outEntry = confirmedCarryOutEntry(monthKey);
     return {
       enabled: carryoverEnabled(),
@@ -1246,7 +1276,8 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
       rawMin,
       totalMin: carryInMin + rawMin,
       carryOutMin: outEntry ? Math.max(0, parseInt(outEntry.minutes, 10) || 0) : 0,
-      carryOutConfirmed: Boolean(outEntry)
+      carryOutConfirmed: Boolean(outEntry),
+      pendingOtherChoice: needsOtherModeChoice(monthKey)
     };
   }
 
@@ -1262,13 +1293,14 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     return mainHoursPatched(monthKey) + otherHoursPatched(monthKey);
   }
 
-  // Annual total is the true sum of everything actually worked in the fiscal year — using
-  // raw minutes per month (not carry-adjusted totals) keeps it independent of how carryover
-  // redistributes minutes across month boundaries for display purposes.
+  // Annual total sums raw minutes per month rather than carry-adjusted totals, so that
+  // carryover moving minutes across a month boundary doesn't count them twice. Minutes
+  // dropped by a 'discard' choice are gone and don't count at all.
   function annualHoursPatched(monthKey = state.selectedMonth) {
     const keys = fiscalMonthKeys(monthKey);
     const totalMin = keys.reduce((sum, key) => {
-      return sum + rawMainMinutesForMonth(key) + rawOtherMinutesForMonth(key);
+      const dropped = otherRemainderMode(key) === 'discard' ? otherRemainderMinutes(key) : 0;
+      return sum + rawMainMinutesForMonth(key) + rawOtherMinutesForMonth(key) - dropped;
     }, 0);
     return totalMin / 60;
   }
@@ -1276,10 +1308,13 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
   function confirmCarryoverForMonth(monthKey, reason = 'reported') {
     if (!carryoverEnabled()) return 0;
 
-    // Only this month's own raw total remainder carries forward — a carry-in it received
-    // from the month before is not passed along again (carries only one month, per
-    // reporting rules).
-    const remainder = rawTotalMinutesForMonth(monthKey) % 60;
+    // Undecided other-service remainder means the carry-out amount isn't determined yet.
+    if (needsOtherModeChoice(monthKey)) return 0;
+
+    // Only this month's own minutes carry forward — a carry-in it received from the month
+    // before is not passed along again (carries only one month, per reporting rules).
+    const merged = otherRemainderMode(monthKey) === 'merge' ? otherRemainderMinutes(monthKey) : 0;
+    const remainder = (rawMainMinutesForMonth(monthKey) + merged) % 60;
     const nextMonth = addMonths(monthKey, 1);
     const map = loadCarryoverMap();
 
@@ -1321,8 +1356,8 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     }
   }
 
-  function firstSessionOfMonth(monthKey) {
-    const mains = state.sessions.filter(s => s.month === monthKey);
+  function firstMainSessionOfMonth(monthKey) {
+    const mains = state.sessions.filter(s => s.month === monthKey && s.cat === 'main');
     if (!mains.length) return null;
     return mains.slice().sort((a, b) => {
       if (a.dateKey !== b.dateKey) return a.dateKey < b.dateKey ? -1 : 1;
@@ -1339,7 +1374,7 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     const row = document.createElement('div');
     row.className = 'summary-row carryover-row';
     row.id = 'carryover-summary-row';
-    row.innerHTML = '<span class="summary-row-label">分数の繰越</span><span class="summary-row-val" id="sum-main-carryover">-</span>';
+    row.innerHTML = '<span class="summary-row-label">野外奉仕の繰越</span><span class="summary-row-val" id="sum-main-carryover">-</span>';
     otherRow.insertAdjacentElement('afterend', row);
   }
 
@@ -1361,15 +1396,76 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     if (info.carryInMin > 0) parts.push('前月から +' + fmtHours(info.carryInMin / 60));
     else parts.push('前月から 0分');
 
-    // A past month's carry-out is settled even when it came out to zero; only the month
-    // still in progress is genuinely undecided.
-    if (info.carryOutConfirmed || info.monthKey < getMonthKey()) {
+    // A past month's carry-out is settled even when it came out to zero; the month still
+    // in progress — or one still waiting on its other-service choice — is undecided.
+    if (!info.pendingOtherChoice && (info.carryOutConfirmed || info.monthKey < getMonthKey())) {
       parts.push('次月へ ' + fmtHours(info.carryOutMin / 60));
     } else {
       parts.push('次月へ 未確定');
     }
 
     el.textContent = parts.join(' / ');
+  }
+
+  function ensureOtherRemainderNotice() {
+    let el = document.getElementById('other-remainder-notice');
+    if (el) return el;
+    const summaryCard = document.getElementById('sum-total')?.closest('.card');
+    if (!summaryCard || !summaryCard.parentNode) return null;
+
+    el = document.createElement('div');
+    el.className = 'card other-remainder-notice';
+    el.id = 'other-remainder-notice';
+    summaryCard.insertAdjacentElement('beforebegin', el);
+    return el;
+  }
+
+  function chooseOtherRemainderMode(monthKey, mode) {
+    setOtherRemainderMode(monthKey, mode);
+    autoConfirmElapsedMonths();
+    updateProgress();
+    renderSummary();
+    if (mode === 'merge') showToast('その他の奉仕の端数を野外奉仕に合算しました');
+    else if (mode === 'discard') showToast('その他の奉仕の端数を切り捨てました');
+  }
+
+  function updateOtherRemainderNotice() {
+    const el = ensureOtherRemainderNotice();
+    if (!el) return;
+
+    const monthKey = state.selectedMonth;
+    const remainder = otherRemainderMinutes(monthKey);
+    if (!carryoverEnabled() || remainder <= 0) {
+      el.style.display = 'none';
+      return;
+    }
+    el.style.display = 'block';
+
+    const mode = otherRemainderMode(monthKey);
+    const remainLabel = fmtHours(remainder / 60);
+
+    if (!mode) {
+      el.classList.add('is-pending');
+      el.innerHTML =
+        '<div class="orn-msg">その他の奉仕の端数(分数)は報告できません。野外奉仕に合算するか切り捨てるか選択してください</div>' +
+        '<div class="orn-sub">今月のその他の奉仕の端数: ' + remainLabel + '</div>' +
+        '<div class="orn-actions">' +
+        '<button type="button" class="orn-btn orn-merge">野外奉仕に合算</button>' +
+        '<button type="button" class="orn-btn orn-discard">切り捨てる</button>' +
+        '</div>';
+      el.querySelector('.orn-merge').addEventListener('click', () => chooseOtherRemainderMode(monthKey, 'merge'));
+      el.querySelector('.orn-discard').addEventListener('click', () => chooseOtherRemainderMode(monthKey, 'discard'));
+      return;
+    }
+
+    el.classList.remove('is-pending');
+    const label = mode === 'merge' ? '野外奉仕に合算' : '切り捨て';
+    el.innerHTML =
+      '<div class="orn-decided">' +
+      '<span>その他の奉仕の端数 ' + remainLabel + '：' + label + '</span>' +
+      '<button type="button" class="orn-change">変更</button>' +
+      '</div>';
+    el.querySelector('.orn-change').addEventListener('click', () => chooseOtherRemainderMode(monthKey, null));
   }
 
   function ensureCarryoverSetting() {
@@ -1384,14 +1480,14 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     const card = document.createElement('div');
     card.className = 'card';
     card.innerHTML = '<div class="setting-row" id="carryover-setting-row">' +
-      '<div><div class="setting-label">分数の繰越</div>' +
-      '<div class="setting-desc">合計時間の1時間未満の端数を、翌月の最初の記録へ繰り越します。</div></div>' +
+      '<div><div class="setting-label">野外奉仕の分数繰越</div>' +
+      '<div class="setting-desc">野外奉仕の1時間未満の端数を、翌月の最初の記録へ繰り越します。</div></div>' +
       '<label class="toggle-switch"><input type="checkbox" id="carryover-enabled-input"><span></span></label>' +
       '</div>';
 
     const hint = document.createElement('div');
     hint.className = 'carryover-setting-note';
-    hint.textContent = '繰り越せるのは翌月までです。記録データそのものは変更しません。';
+    hint.textContent = '繰り越せるのは翌月までです。その他の奉仕の端数は繰り越せないため、集計画面で毎月「合算」か「切り捨て」を選びます。記録データそのものは変更しません。';
 
     annualGoalSection.nextElementSibling?.insertAdjacentElement('afterend', hint);
     hint.insertAdjacentElement('beforebegin', card);
@@ -1440,6 +1536,7 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     window.renderSummary = function patchedRenderSummary() {
       if (typeof originalRenderSummary === 'function') originalRenderSummary();
       updateCarryoverSummary();
+      updateOtherRemainderNotice();
     };
     renderSummary = window.renderSummary;
   }
@@ -1461,7 +1558,7 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
       }
 
       const carryInMin = carryoverEnabled() ? confirmedCarryInMinutes(monthKey) : 0;
-      const carryTarget = carryInMin > 0 ? firstSessionOfMonth(monthKey) : null;
+      const carryTarget = carryInMin > 0 ? firstMainSessionOfMonth(monthKey) : null;
 
       container.innerHTML = '';
       sessions.forEach(s => {
@@ -1569,6 +1666,16 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
       .toggle-switch input:checked + span:before { transform: translateX(22px); }
       .carryover-setting-note { font-size: 13px; color: #8e8e93; padding: 8px 4px; }
       .badge-carryover { background: #d1f0e7; color: #0f6e56; margin-left: 4px; }
+      .other-remainder-notice { padding: 16px; }
+      .other-remainder-notice.is-pending { border-left: 3px solid #ff9500; }
+      .orn-msg { font-size: 14px; line-height: 1.55; font-weight: 500; }
+      .orn-sub { font-size: 13px; color: #8e8e93; margin-top: 6px; }
+      .orn-actions { display: flex; gap: 8px; margin-top: 12px; }
+      .orn-btn { flex: 1; border: none; border-radius: 10px; padding: 11px 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+      .orn-merge { background: #1D9E75; color: #fff; }
+      .orn-discard { background: #f2f2f7; color: #1c1c1e; }
+      .orn-decided { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; }
+      .orn-change { border: none; background: #f2f2f7; color: #1D9E75; border-radius: 8px; padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; flex-shrink: 0; }
     `;
     document.head.appendChild(style);
   }
