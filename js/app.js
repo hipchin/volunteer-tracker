@@ -1129,9 +1129,12 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
 // volunteer-tracker carryover + robust update patch
 // This file intentionally does not change vt_sessions.
 // Carryover rule:
-// - Do NOT carry over the current month's remainder automatically.
-// - When a month is marked as reported, only that month's main-service remainder is confirmed
-//   and carried into the next month.
+// - A month's carry-out to the next month is based on that month's OWN raw main-service
+//   remainder only (never including whatever carried into it from the month before).
+// - A month's carry-in is added to its own total/display and to its first main-service
+//   session, but is spent there: it does not chain into what that month carries onward.
+//   Per reporting rules, a remainder can only ever be carried into the immediately next
+//   month, not further.
 // - Other service is never carried over.
 
 (function () {
@@ -1218,15 +1221,6 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     return baseMainTotalMinutes(monthKey);
   }
 
-  // Whole-hour total used only for annual aggregation, so a remainder that has already
-  // been carried into the next month isn't also counted a second time in that next month.
-  function reportableMainMinutesForMonth(monthKey) {
-    const total = baseMainTotalMinutes(monthKey);
-    if (!carryoverEnabled()) return rawMainMinutesForMonth(monthKey);
-    if (hasConfirmedCarryOut(monthKey)) return total - (total % 60);
-    return total;
-  }
-
   function mainCarryoverInfo(monthKey) {
     const carryInMin = confirmedCarryInMinutes(monthKey);
     const rawMin = rawMainMinutesForMonth(monthKey);
@@ -1256,10 +1250,13 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     return mainHoursPatched(monthKey) + otherHoursPatched(monthKey);
   }
 
+  // Annual total is the true sum of everything actually worked in the fiscal year — using
+  // raw minutes per month (not carry-adjusted totals) keeps it independent of how carryover
+  // redistributes minutes across month boundaries for display purposes.
   function annualHoursPatched(monthKey = state.selectedMonth) {
     const keys = fiscalMonthKeys(monthKey);
     const totalMin = keys.reduce((sum, key) => {
-      return sum + reportableMainMinutesForMonth(key) + rawOtherMinutesForMonth(key);
+      return sum + rawMainMinutesForMonth(key) + rawOtherMinutesForMonth(key);
     }, 0);
     return totalMin / 60;
   }
@@ -1267,8 +1264,9 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
   function confirmCarryoverForMonth(monthKey, reason = 'reported') {
     if (!carryoverEnabled()) return 0;
 
-    const total = baseMainTotalMinutes(monthKey);
-    const remainder = total % 60;
+    // Only this month's own raw remainder carries forward — a carry-in it received from
+    // the month before is not passed along again (carries only one month, per reporting rules).
+    const remainder = rawMainMinutesForMonth(monthKey) % 60;
     const nextMonth = addMonths(monthKey, 1);
     const map = loadCarryoverMap();
 
@@ -1318,38 +1316,6 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
       if (a.start !== b.start) return a.start < b.start ? -1 : 1;
       return String(a.id).localeCompare(String(b.id));
     })[0];
-  }
-
-  function migrateReportedCarryovers() {
-    if (!carryoverEnabled() || !state || !state.reported) return;
-
-    const map = loadCarryoverMap();
-    let changed = false;
-
-    Object.keys(state.reported)
-      .filter(monthKey => state.reported[monthKey] === true)
-      .sort()
-      .forEach(monthKey => {
-        const nextMonth = addMonths(monthKey, 1);
-        const existing = map[nextMonth];
-        const alreadyFromThisMonth = existing && typeof existing === 'object' && existing.fromMonth === monthKey;
-        if (alreadyFromThisMonth) return;
-
-        const total = confirmedCarryInMinutes(monthKey) + rawMainMinutesForMonth(monthKey);
-        const remainder = total % 60;
-
-        if (remainder > 0) {
-          map[nextMonth] = {
-            fromMonth: monthKey,
-            minutes: remainder,
-            confirmedAt: new Date().toISOString(),
-            reason: 'migration-from-reported-month'
-          };
-          changed = true;
-        }
-      });
-
-    if (changed) saveCarryoverMap(map);
   }
 
   function ensureCarryoverSummaryRow() {
@@ -1418,7 +1384,7 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
       input.checked = carryoverEnabled();
       input.addEventListener('change', () => {
         setCarryoverEnabled(input.checked);
-        if (input.checked) migrateReportedCarryovers();
+        if (input.checked) autoConfirmElapsedMonths();
         updateProgress();
         renderSummary();
         checkGoalAchievement();
@@ -1629,7 +1595,6 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     reloadLatestApp = window.reloadLatestApp;
 
     autoConfirmElapsedMonths();
-    migrateReportedCarryovers();
 
     updateProgress();
     updateAppInfo();
