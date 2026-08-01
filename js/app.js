@@ -1210,15 +1210,20 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     return confirmedCarryInMinutes(monthKey) + rawMainMinutesForMonth(monthKey);
   }
 
+  // Full total for this month's own display/goal progress: always includes confirmed
+  // carry-in and any not-yet-carried-out remainder, so a month's own total (and whether
+  // it hit its goal) reflects everything actually worked in it.
   function displayMainMinutesForMonth(monthKey) {
+    if (!carryoverEnabled()) return rawMainMinutesForMonth(monthKey);
+    return baseMainTotalMinutes(monthKey);
+  }
+
+  // Whole-hour total used only for annual aggregation, so a remainder that has already
+  // been carried into the next month isn't also counted a second time in that next month.
+  function reportableMainMinutesForMonth(monthKey) {
     const total = baseMainTotalMinutes(monthKey);
     if (!carryoverEnabled()) return rawMainMinutesForMonth(monthKey);
-
-    // If this month has already been finalized and its remainder was sent forward,
-    // show only whole-hour main-service time for this reported month.
     if (hasConfirmedCarryOut(monthKey)) return total - (total % 60);
-
-    // Before reporting, show the actual accumulated total including confirmed carry-in.
     return total;
   }
 
@@ -1254,7 +1259,7 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
   function annualHoursPatched(monthKey = state.selectedMonth) {
     const keys = fiscalMonthKeys(monthKey);
     const totalMin = keys.reduce((sum, key) => {
-      return sum + displayMainMinutesForMonth(key) + rawOtherMinutesForMonth(key);
+      return sum + reportableMainMinutesForMonth(key) + rawOtherMinutesForMonth(key);
     }, 0);
     return totalMin / 60;
   }
