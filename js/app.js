@@ -1133,9 +1133,11 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
 //   not be pooled with the main-service remainder to make up an hour. Each month you choose
 //   what happens to the other-service remainder: merge it into main service, or drop it.
 //   Either way other service itself is reported in whole hours.
-// - A month's carry-out is the sub-hour remainder of its own main-service minutes (plus the
-//   other-service remainder when merged), never including whatever carried into it from the
-//   month before. Per reporting rules, a remainder can only ever be carried into the
+// - A month's carry-out is what is left over after reporting whole hours from everything it
+//   has available (carry-in plus its own minutes) — the carry-in is consumed first, so any
+//   full hour it helped complete is reported here rather than carried again. Only minutes
+//   originating in this month may carry: if carry-in plus own minutes never reach an hour,
+//   the unused carry-in is dropped, since a remainder can only ever be carried into the
 //   immediately next month.
 // - Until a month's other-service remainder choice is made, that month carries nothing
 //   forward: the amount isn't determined yet.
@@ -1246,6 +1248,23 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     return otherRemainderMinutes(monthKey) > 0 && !otherRemainderMode(monthKey);
   }
 
+  // Splits a month's available minutes into what gets reported as whole hours, what may
+  // carry into the next month, and what has to be dropped. The carry-in is spent first, so
+  // once it has helped complete an hour that hour is reported here; whatever is left over
+  // belongs to this month and carries. If the month never reaches a full hour, the carry-in
+  // has nowhere left to go and is lost — it cannot be carried a second time.
+  function carryBreakdownFor(monthKey) {
+    const merged = otherRemainderMode(monthKey) === 'merge' ? otherRemainderMinutes(monthKey) : 0;
+    const ownMin = rawMainMinutesForMonth(monthKey) + merged;
+    const leftover = (confirmedCarryInMinutes(monthKey) + ownMin) % 60;
+    return {
+      ownMin,
+      leftover,
+      carryOut: Math.min(leftover, ownMin),
+      dropped: Math.max(0, leftover - ownMin)
+    };
+  }
+
   // Per-category totals for this month's own display/goal progress: they include the
   // confirmed carry-in and any not-yet-carried-out remainder, so a month's own total
   // (and whether it hit its goal) reflects everything actually worked in it. The
@@ -1277,7 +1296,8 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
       totalMin: carryInMin + rawMin,
       carryOutMin: outEntry ? Math.max(0, parseInt(outEntry.minutes, 10) || 0) : 0,
       carryOutConfirmed: Boolean(outEntry),
-      pendingOtherChoice: needsOtherModeChoice(monthKey)
+      pendingOtherChoice: needsOtherModeChoice(monthKey),
+      droppedMin: carryBreakdownFor(monthKey).dropped
     };
   }
 
@@ -1294,13 +1314,16 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
   }
 
   // Annual total sums raw minutes per month rather than carry-adjusted totals, so that
-  // carryover moving minutes across a month boundary doesn't count them twice. Minutes
-  // dropped by a 'discard' choice are gone and don't count at all.
+  // carryover moving minutes across a month boundary doesn't count them twice. Minutes that
+  // are gone for good — dropped by a 'discard' choice, or a carry-in a settled month could
+  // not absorb — don't count at all.
   function annualHoursPatched(monthKey = state.selectedMonth) {
     const keys = fiscalMonthKeys(monthKey);
     const totalMin = keys.reduce((sum, key) => {
-      const dropped = otherRemainderMode(key) === 'discard' ? otherRemainderMinutes(key) : 0;
-      return sum + rawMainMinutesForMonth(key) + rawOtherMinutesForMonth(key) - dropped;
+      const discarded = otherRemainderMode(key) === 'discard' ? otherRemainderMinutes(key) : 0;
+      const settled = key < getMonthKey() && !needsOtherModeChoice(key);
+      const unusable = settled ? carryBreakdownFor(key).dropped : 0;
+      return sum + rawMainMinutesForMonth(key) + rawOtherMinutesForMonth(key) - discarded - unusable;
     }, 0);
     return totalMin / 60;
   }
@@ -1311,10 +1334,7 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     // Undecided other-service remainder means the carry-out amount isn't determined yet.
     if (needsOtherModeChoice(monthKey)) return 0;
 
-    // Only this month's own minutes carry forward — a carry-in it received from the month
-    // before is not passed along again (carries only one month, per reporting rules).
-    const merged = otherRemainderMode(monthKey) === 'merge' ? otherRemainderMinutes(monthKey) : 0;
-    const remainder = (rawMainMinutesForMonth(monthKey) + merged) % 60;
+    const remainder = carryBreakdownFor(monthKey).carryOut;
     const nextMonth = addMonths(monthKey, 1);
     const map = loadCarryoverMap();
 
@@ -1399,7 +1419,10 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     // A past month's carry-out is settled even when it came out to zero; the month still
     // in progress — or one still waiting on its other-service choice — is undecided.
     if (!info.pendingOtherChoice && (info.carryOutConfirmed || info.monthKey < getMonthKey())) {
-      parts.push('次月へ ' + fmtHours(info.carryOutMin / 60));
+      let out = '次月へ ' + fmtHours(info.carryOutMin / 60);
+      // 1時間に届かず、前月から来た分を使いきれなかった場合は消える
+      if (info.droppedMin > 0) out += '（' + fmtHours(info.droppedMin / 60) + 'は繰越不可）';
+      parts.push(out);
     } else {
       parts.push('次月へ 未確定');
     }
