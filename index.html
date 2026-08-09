@@ -374,7 +374,10 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
       <div class="card">
         <div class="report-card-title" id="report-title">奉仕報告</div>
         <div class="report-card-sub" id="report-summary-text">月別の奉仕報告を確認できます。</div>
-        <div style="padding:0 16px 16px"><button class="btn-primary btn-green" id="report-done-btn" onclick="markReportDone()">報告済みにする</button></div>
+        <div style="padding:0 16px 16px">
+          <button class="btn-primary btn-green" id="report-done-btn" onclick="markReportDone()">報告済みにする</button>
+          <button class="btn-primary btn-gray" id="report-undo-btn" onclick="unmarkReportDone()" style="display:none;margin-top:8px">報告済みを取り消す</button>
+        </div>
         <div class="report-status" id="report-status">未報告</div>
       </div>
     </div>
