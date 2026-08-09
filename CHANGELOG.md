@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 2026-08-09 - report-undo-1
+
+### Added
+
+- 集計画面で「報告済みにする」を誤って押した場合に取り消せる「報告済みを取り消す」ボタンを追加。報告済みのときのみ表示され、押すと確認ダイアログを経て未報告へ戻せる。
+- 分数繰越が有効な場合、報告済みへの変更時に翌月へ繰り越した端数分を、取り消し時にも一緒に取り消すよう対応。
+
+### Changed
+
+- `index.html` のJSバージョンクエリ、`js/app.js` 内の `APP_VERSION` / `VT_APP_BUILD` / `VT_APP_VERSION_LABEL`、`sw.js` の `CACHE_VERSION` / `APP_SHELL` を `20260809-1` に同期。
+
 ## 2026-07-26 - no-startup-log-1
 
 ### Removed

@@ -1,6 +1,6 @@
 // ==== storage.js ====
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.07.26.no-startup-log-1';
+const APP_VERSION = '2026.08.09.report-undo-1';
 const BACKUP_SCHEMA_VERSION = 2;
 const SESSION_NORMALIZED_VERSION = 2;
 
@@ -399,10 +399,12 @@ function renderSummary() {
   const reportSummaryText = document.getElementById('report-summary-text');
   const reportStatus = document.getElementById('report-status');
   const reportDoneBtn = document.getElementById('report-done-btn');
+  const reportUndoBtn = document.getElementById('report-undo-btn');
   if (reportTitle) reportTitle.textContent = monthShortLabel(state.selectedMonth) + '奉仕報告';
   if (reportSummaryText) reportSummaryText.textContent = reportTextForMonth(state.selectedMonth);
   if (reportStatus) reportStatus.textContent = isReported(state.selectedMonth) ? '報告済み' : '未報告';
   if (reportDoneBtn) reportDoneBtn.style.display = isReported(state.selectedMonth) ? 'none' : 'block';
+  if (reportUndoBtn) reportUndoBtn.style.display = isReported(state.selectedMonth) ? 'block' : 'none';
 }
 
 function showTab(tab) {
@@ -941,6 +943,12 @@ function markReportDone() {
   renderSummary();
   showToast(monthLabel(state.selectedMonth) + 'を報告済みにしました');
 }
+function unmarkReportDone() {
+  if (!confirm(monthLabel(state.selectedMonth) + 'の報告済みを取り消しますか？')) return;
+  setReported(state.selectedMonth, false);
+  renderSummary();
+  showToast(monthLabel(state.selectedMonth) + 'の報告済みを取り消しました');
+}
 function pendingReportMonth() {
   const prev = previousMonthKey();
   return isReported(prev) ? null : prev;
@@ -1114,7 +1122,7 @@ Object.assign(window, {
   submitManual, addDeductRow, removeDeduct, confirmSession,
   selectEditCat, startEditSession, cancelEditSession, saveEditSession, deleteEditSession,
   exportBackup, openImportBackup, importBackupFile, reloadLatestApp,
-  changeSelectedMonth, saveLessonCount, markReportDone, openPendingReport, snoozeReportNotice,
+  changeSelectedMonth, saveLessonCount, markReportDone, unmarkReportDone, openPendingReport, snoozeReportNotice,
   saveGoal, saveAnnualGoal, showTab, hideGoalBanner,
   applyUpdateNow, dismissUpdateBanner,
   deductRows
@@ -1122,8 +1130,8 @@ Object.assign(window, {
 
 // ==== app-version.js ====
 // 次回以降の更新では、まずこの2つだけを変更する。
-window.VT_APP_BUILD = '20260726-3';
-window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
+window.VT_APP_BUILD = '20260809-1';
+window.VT_APP_VERSION_LABEL = '2026.08.09.report-undo-1';
 
 // ==== carryover-update.js ====
 // volunteer-tracker carryover + robust update patch
@@ -1301,6 +1309,21 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     return CATEGORIES.reduce((sum, cat) => sum + confirmCategoryCarryover(monthKey, cat, reason), 0);
   }
 
+  function unconfirmCarryoverForMonth(monthKey) {
+    if (!carryoverEnabled()) return 0;
+    return CATEGORIES.reduce((sum, cat) => sum + unconfirmCategoryCarryover(monthKey, cat), 0);
+  }
+
+  function unconfirmCategoryCarryover(monthKey, cat) {
+    const nextMonth = addMonths(monthKey, 1);
+    const map = loadCarryoverMap(cat);
+    const existing = map[nextMonth];
+    if (!existing || typeof existing !== 'object' || existing.fromMonth !== monthKey) return 0;
+    delete map[nextMonth];
+    saveCarryoverMap(cat, map);
+    return Math.max(0, parseInt(existing.minutes, 10) || 0);
+  }
+
   function confirmCategoryCarryover(monthKey, cat, reason) {
     const remainder = carryBreakdownFor(monthKey, cat).carryOut;
     const nextMonth = addMonths(monthKey, 1);
@@ -1466,6 +1489,27 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
       }
     };
     markReportDone = window.markReportDone;
+  }
+
+  function patchUnmarkReportDone() {
+    window.unmarkReportDone = function patchedUnmarkReportDone() {
+      const monthKey = state.selectedMonth;
+      if (!isReported(monthKey)) return;
+      if (!confirm(monthLabel(monthKey) + 'の報告済みを取り消しますか？')) return;
+
+      const carryMin = unconfirmCarryoverForMonth(monthKey);
+      setReported(monthKey, false);
+
+      updateProgress();
+      renderSummary();
+
+      if (carryoverEnabled() && carryMin > 0) {
+        showToast(monthLabel(monthKey) + 'の報告済みを取り消し、翌月への繰り越し ' + fmtHours(carryMin / 60) + ' も取り消しました');
+      } else {
+        showToast(monthLabel(monthKey) + 'の報告済みを取り消しました');
+      }
+    };
+    unmarkReportDone = window.unmarkReportDone;
   }
 
   function patchRenderSummary() {
@@ -1651,6 +1695,7 @@ window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
     patchUpdateAppInfo();
     patchReportText();
     patchMarkReportDone();
+    patchUnmarkReportDone();
     patchRenderSummary();
     patchRenderLog();
     patchShowTab();

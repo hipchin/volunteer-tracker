@@ -374,7 +374,10 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
       <div class="card">
         <div class="report-card-title" id="report-title">奉仕報告</div>
         <div class="report-card-sub" id="report-summary-text">月別の奉仕報告を確認できます。</div>
-        <div style="padding:0 16px 16px"><button class="btn-primary btn-green" id="report-done-btn" onclick="markReportDone()">報告済みにする</button></div>
+        <div style="padding:0 16px 16px">
+          <button class="btn-primary btn-green" id="report-done-btn" onclick="markReportDone()">報告済みにする</button>
+          <button class="btn-primary btn-gray" id="report-undo-btn" onclick="unmarkReportDone()" style="display:none;margin-top:8px">報告済みを取り消す</button>
+        </div>
         <div class="report-status" id="report-status">未報告</div>
       </div>
     </div>
@@ -451,7 +454,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 <div class="notice-overlay" id="report-notice-overlay"><div class="notice-card"><div class="notice-title">📌 奉仕報告の確認</div><div class="notice-msg">先月分の奉仕報告がまだ完了していません。<br><br>集計画面で内容を確認し、<br>レッスン件数を入力してください。</div><div class="notice-actions"><button class="btn-primary btn-green" onclick="openPendingReport()">集計を開く</button><button class="btn-primary btn-gray" onclick="snoozeReportNotice()">あとで</button></div></div></div>
 <div class="goal-overlay" id="goal-overlay" onclick="hideGoalBanner()"><div class="goal-card"><div class="goal-title">🎉目標達成！</div><div class="goal-msg">よく頑張りました！<br>あなたは忠実な良い奴隷です。</div></div></div>
 
-<script src="js/app.js?v=20260726-3"></script>
+<script src="js/app.js?v=20260809-1"></script>
 <script>
 (function(){
   var MIN_STARTUP_DISPLAY_MS = 1300;
