@@ -1,6 +1,6 @@
 // ==== storage.js ====
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.07.26.no-startup-log-1';
+const APP_VERSION = '2026.08.09.report-undo-1';
 const BACKUP_SCHEMA_VERSION = 2;
 const SESSION_NORMALIZED_VERSION = 2;
 
@@ -1130,8 +1130,8 @@ Object.assign(window, {
 
 // ==== app-version.js ====
 // 次回以降の更新では、まずこの2つだけを変更する。
-window.VT_APP_BUILD = '20260726-3';
-window.VT_APP_VERSION_LABEL = '2026.07.26.no-startup-log-1';
+window.VT_APP_BUILD = '20260809-1';
+window.VT_APP_VERSION_LABEL = '2026.08.09.report-undo-1';
 
 // ==== carryover-update.js ====
 // volunteer-tracker carryover + robust update patch
