@@ -301,7 +301,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
           </div>
         </div>
         <div style="padding:16px 16px 4px;display:none" id="visit-count-section">
-          <div class="deduct-title">訪問件数（任意）</div>
+          <div class="deduct-title">再訪問件数（任意）</div>
           <div class="input-row"><label>件数</label><input type="number" id="confirm-visit-count" min="0" step="1" inputmode="numeric" placeholder="0"></div>
         </div>
         <div style="padding:16px 16px 4px">
@@ -401,7 +401,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
       <div class="section-header">表示設定</div>
       <div class="card">
         <div class="setting-row">
-          <div><div class="setting-label">訪問件数の入力</div><div class="setting-desc">奉仕記録に、時間とは別に訪問した件数を入力する欄を表示します。</div></div>
+          <div><div class="setting-label">再訪問件数の入力</div><div class="setting-desc">奉仕記録に、時間とは別に訪問した件数を入力する欄を表示します。</div></div>
           <label class="toggle-switch"><input type="checkbox" id="visit-count-enabled-input" onchange="onVisitCountToggle(this.checked)"><span></span></label>
         </div>
       </div>
@@ -473,7 +473,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 <div class="notice-overlay" id="report-notice-overlay"><div class="notice-card"><div class="notice-title">📌 奉仕報告の確認</div><div class="notice-msg">先月分の奉仕報告がまだ完了していません。<br><br>集計画面で内容を確認し、<br>レッスン件数を入力してください。</div><div class="notice-actions"><button class="btn-primary btn-green" onclick="openPendingReport()">集計を開く</button><button class="btn-primary btn-gray" onclick="snoozeReportNotice()">あとで</button></div></div></div>
 <div class="goal-overlay" id="goal-overlay" onclick="hideGoalBanner()"><div class="goal-card"><div class="goal-title">🎉目標達成！</div><div class="goal-msg">よく頑張りました！<br>あなたは忠実な良い奴隷です。</div></div></div>
 
-<script src="js/app.js?v=20260823-visitcount1"></script>
+<script src="js/app.js?v=20260823-visitcount2"></script>
 <script>
 (function(){
   var MIN_STARTUP_DISPLAY_MS = 1300;
