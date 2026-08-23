@@ -1,8 +1,17 @@
 // ==== storage.js ====
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.08.09.report-undo-1';
+const APP_VERSION = '2026.08.23.visit-count-1';
 const BACKUP_SCHEMA_VERSION = 2;
 const SESSION_NORMALIZED_VERSION = 2;
+const VISIT_COUNT_ENABLED_KEY = 'vt_visit_count_enabled';
+
+function visitCountEnabled() {
+  return localStorage.getItem(VISIT_COUNT_ENABLED_KEY) === 'true';
+}
+
+function setVisitCountEnabled(value) {
+  localStorage.setItem(VISIT_COUNT_ENABLED_KEY, value ? 'true' : 'false');
+}
 
 function makeSessionId() {
   return 's_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
@@ -358,10 +367,12 @@ function renderLog() {
     const deductNote = Number(s.deductMin) > 0 ? '（-' + Number(s.deductMin) + '分）' : '';
     const manualBadge = s.manual ? '<span class="badge badge-manual">手動</span>' : '';
     const editedBadge = s.edited ? '<span class="badge badge-edited">編集済</span>' : '';
+    const visitCountBadge = visitCountEnabled() && s.visitCount !== undefined && s.visitCount !== null
+      ? '<span class="badge badge-visit-count">' + s.visitCount + '件</span>' : '';
     div.innerHTML = '<div class="log-left"><div class="log-date-str">' + s.date + '</div>' +
       '<div class="log-time-str">' + s.start + ' 〜 ' + s.end + deductNote + '</div>' +
       '<div class="log-actions"><button class="log-edit-btn" type="button">編集</button></div></div>' +
-      '<div class="log-right"><div><span class="badge badge-' + (s.cat === 'main' ? 'main' : 'other') + '">' + CAT_LABEL[s.cat] + '</span>' + manualBadge + editedBadge + '</div>' +
+      '<div class="log-right"><div><span class="badge badge-' + (s.cat === 'main' ? 'main' : 'other') + '">' + CAT_LABEL[s.cat] + '</span>' + manualBadge + editedBadge + visitCountBadge + '</div>' +
       '<div class="log-hours">' + fmtHours(sessionMinutes(s) / 60) + '</div></div>';
     div.querySelector('.log-edit-btn').addEventListener('click', () => startEditSession(s.id));
     container.appendChild(div);
@@ -419,8 +430,25 @@ function showTab(tab) {
     document.getElementById('goal-input').value = state.goal;
     const annualGoalInput = document.getElementById('annual-goal-input');
     if (annualGoalInput) annualGoalInput.value = state.annualGoal;
+    const visitCountEnabledInput = document.getElementById('visit-count-enabled-input');
+    if (visitCountEnabledInput) visitCountEnabledInput.checked = visitCountEnabled();
     updateAppInfo();
   }
+}
+
+function applyVisitCountVisibility() {
+  const enabled = visitCountEnabled();
+  const confirmSection = document.getElementById('visit-count-section');
+  if (confirmSection) confirmSection.style.display = enabled ? 'block' : 'none';
+  const editRow = document.getElementById('edit-visit-count-row');
+  if (editRow) editRow.style.display = enabled ? 'flex' : 'none';
+}
+
+function onVisitCountToggle(checked) {
+  setVisitCountEnabled(checked);
+  applyVisitCountVisibility();
+  if (document.getElementById('view-log')?.style.display !== 'none') renderLog();
+  showToast(checked ? '訪問件数の入力を表示しました' : '訪問件数の入力を非表示にしました');
 }
 
 function updateAppInfo() {
@@ -696,6 +724,9 @@ function confirmSession() {
   }
   netMin = Math.max(0, netMin - deductMin);
   const dateStr = state.manualDate;
+  const visitCountInput = document.getElementById('confirm-visit-count');
+  const visitCountRaw = visitCountInput ? visitCountInput.value.trim() : '';
+  const visitCount = visitCountRaw === '' ? undefined : Math.max(0, parseInt(visitCountRaw, 10) || 0);
   const session = {
     id: makeSessionId(),
     month: dateToMonthKey(dateStr),
@@ -710,6 +741,7 @@ function confirmSession() {
     manual: state.isManual,
     edited: false
   };
+  if (visitCount !== undefined) session.visitCount = visitCount;
   state.sessions.push(session);
   persistSessions();
   deductRows = [];
@@ -717,6 +749,7 @@ function confirmSession() {
   resetTimerInputUI();
   document.getElementById('manual-start').value = '';
   document.getElementById('manual-end').value = '';
+  if (visitCountInput) visitCountInput.value = '';
   updateProgress();
   showToast(fmtHours(session.hours) + ' を記録しました');
   checkGoalAchievement();
@@ -736,6 +769,10 @@ function startEditSession(id) {
   document.getElementById('edit-start').value = session.start;
   document.getElementById('edit-end').value = session.end;
   document.getElementById('edit-deduct').value = Number(session.deductMin) || 0;
+  const editVisitCountInput = document.getElementById('edit-visit-count');
+  if (editVisitCountInput) {
+    editVisitCountInput.value = session.visitCount !== undefined && session.visitCount !== null ? session.visitCount : '';
+  }
   document.getElementById('edit-sub').textContent = session.date + ' ' + session.start + ' 〜 ' + session.end;
   document.getElementById('edit-card').style.display = 'block';
   renderLog();
@@ -768,7 +805,9 @@ function saveEditSession() {
   const index = state.sessions.findIndex(s => s.id === editingSessionId);
   if (index === -1) { showToast('編集する記録が見つかりません'); return; }
   const prev = state.sessions[index];
-  state.sessions[index] = {
+  const editVisitCountInput = document.getElementById('edit-visit-count');
+  const editVisitCountRaw = editVisitCountInput ? editVisitCountInput.value.trim() : '';
+  const nextSession = {
     ...prev,
     month: dateToMonthKey(values.dateStr),
     date: values.dateStr.replace(/-/g, '/'),
@@ -781,6 +820,9 @@ function saveEditSession() {
     hours: values.netMin / 60,
     edited: true
   };
+  if (editVisitCountRaw === '') delete nextSession.visitCount;
+  else nextSession.visitCount = Math.max(0, parseInt(editVisitCountRaw, 10) || 0);
+  state.sessions[index] = nextSession;
   persistSessions();
   updateProgress();
   renderSummary();
@@ -1111,6 +1153,7 @@ function initApp() {
   updateProgress();
   updateAppInfo();
   updateMonthLabels();
+  applyVisitCountVisibility();
   registerSW();
   initDeferredStartupTasks();
 }
@@ -1124,14 +1167,14 @@ Object.assign(window, {
   exportBackup, openImportBackup, importBackupFile, reloadLatestApp,
   changeSelectedMonth, saveLessonCount, markReportDone, unmarkReportDone, openPendingReport, snoozeReportNotice,
   saveGoal, saveAnnualGoal, showTab, hideGoalBanner,
-  applyUpdateNow, dismissUpdateBanner,
+  applyUpdateNow, dismissUpdateBanner, onVisitCountToggle,
   deductRows
 });
 
 // ==== app-version.js ====
 // 次回以降の更新では、まずこの2つだけを変更する。
-window.VT_APP_BUILD = '20260809-1';
-window.VT_APP_VERSION_LABEL = '2026.08.09.report-undo-1';
+window.VT_APP_BUILD = '20260823-visitcount1';
+window.VT_APP_VERSION_LABEL = '2026.08.23.visit-count-1';
 
 // ==== carryover-update.js ====
 // volunteer-tracker carryover + robust update patch
@@ -1560,13 +1603,15 @@ window.VT_APP_VERSION_LABEL = '2026.08.09.report-undo-1';
         const deductNote = Number(s.deductMin) > 0 ? '（-' + Number(s.deductMin) + '分）' : '';
         const manualBadge = s.manual ? '<span class="badge badge-manual">手動</span>' : '';
         const editedBadge = s.edited ? '<span class="badge badge-edited">編集済</span>' : '';
+        const visitCountBadge = visitCountEnabled() && s.visitCount !== undefined && s.visitCount !== null
+          ? '<span class="badge badge-visit-count">' + s.visitCount + '件</span>' : '';
         const carryInMin = carryTargets[s.id] || 0;
         const carryBadge = carryInMin > 0 ? '<span class="badge badge-carryover">前月繰越+' + fmtHours(carryInMin / 60) + '</span>' : '';
         const displayMin = sessionMinutes(s) + carryInMin;
         div.innerHTML = '<div class="log-left"><div class="log-date-str">' + s.date + '</div>' +
           '<div class="log-time-str">' + s.start + ' 〜 ' + s.end + deductNote + '</div>' +
           '<div class="log-actions"><button class="log-edit-btn" type="button">編集</button></div></div>' +
-          '<div class="log-right"><div><span class="badge badge-' + (s.cat === 'main' ? 'main' : 'other') + '">' + CAT_LABEL[s.cat] + '</span>' + manualBadge + editedBadge + carryBadge + '</div>' +
+          '<div class="log-right"><div><span class="badge badge-' + (s.cat === 'main' ? 'main' : 'other') + '">' + CAT_LABEL[s.cat] + '</span>' + manualBadge + editedBadge + visitCountBadge + carryBadge + '</div>' +
           '<div class="log-hours">' + fmtHours(displayMin / 60) + '</div></div>';
         div.querySelector('.log-edit-btn').addEventListener('click', () => startEditSession(s.id));
         container.appendChild(div);
