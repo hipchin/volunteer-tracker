@@ -1,10 +1,17 @@
 # CHANGELOG
 
+## 2026-08-23 - visit-count-2
+
+### Changed
+
+- 「訪問件数」の表記を「再訪問件数」に変更（画面表示・トースト文言・ドキュメント）。内部の`visitCount`/`vt_visit_count_enabled`キー名は変更していない。
+- `index.html` のJSバージョンクエリ、`js/app.js` 内の `APP_VERSION` / `VT_APP_BUILD` / `VT_APP_VERSION_LABEL`、`sw.js` の `CACHE_VERSION` / `APP_SHELL` を `20260823-visitcount2` に同期。
+
 ## 2026-08-23 - visit-count-1
 
 ### Added
 
-- 奉仕記録の確定時・編集時に、時間とは別に「訪問件数」を任意で入力できる項目を追加（`session.visitCount`）。
+- 奉仕記録の確定時・編集時に、時間とは別に「再訪問件数」を任意で入力できる項目を追加（`session.visitCount`）。
 - 設定画面に「表示設定」セクションを追加し、この件数入力欄をオン・オフできるトグルを追加。既定値はオフ。`vt_visit_count_enabled` に保存（バックアップ対象外。既存の `vt_main_carryover_enabled` と同じ扱い）。
 - 履歴一覧で、表示設定がオンかつ件数が入力されている記録に件数バッジを表示。オフにしても記録データ自体は保持され、再度オンにすれば表示される。
 

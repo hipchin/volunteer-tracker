@@ -1,6 +1,6 @@
 // ==== storage.js ====
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.08.23.visit-count-1';
+const APP_VERSION = '2026.08.23.visit-count-2';
 const BACKUP_SCHEMA_VERSION = 2;
 const SESSION_NORMALIZED_VERSION = 2;
 const VISIT_COUNT_ENABLED_KEY = 'vt_visit_count_enabled';
@@ -448,7 +448,7 @@ function onVisitCountToggle(checked) {
   setVisitCountEnabled(checked);
   applyVisitCountVisibility();
   if (document.getElementById('view-log')?.style.display !== 'none') renderLog();
-  showToast(checked ? '訪問件数の入力を表示しました' : '訪問件数の入力を非表示にしました');
+  showToast(checked ? '再訪問件数の入力を表示しました' : '再訪問件数の入力を非表示にしました');
 }
 
 function updateAppInfo() {
@@ -1173,8 +1173,8 @@ Object.assign(window, {
 
 // ==== app-version.js ====
 // 次回以降の更新では、まずこの2つだけを変更する。
-window.VT_APP_BUILD = '20260823-visitcount1';
-window.VT_APP_VERSION_LABEL = '2026.08.23.visit-count-1';
+window.VT_APP_BUILD = '20260823-visitcount2';
+window.VT_APP_VERSION_LABEL = '2026.08.23.visit-count-2';
 
 // ==== carryover-update.js ====
 // volunteer-tracker carryover + robust update patch
