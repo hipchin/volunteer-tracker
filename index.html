@@ -149,6 +149,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 .badge-other { background: #fef0cc; color: #854f0b; }
 .badge-manual { background: #f2f2f7; color: #8e8e93; margin-left: 4px; }
 .badge-edited { background: #e8f1ff; color: #1d4f91; margin-left: 4px; }
+.badge-visit-count { background: #fde8f3; color: #9d174d; margin-left: 4px; }
 .log-actions { margin-top: 8px; }
 .log-edit-btn { border: none; background: #f2f2f7; color: #1D9E75; border-radius: 8px; padding: 6px 10px; font-size: 13px; font-weight: 500; cursor: pointer; transition: transform 0.08s ease, filter 0.08s ease, opacity 0.08s ease, background-color 0.12s ease; }
 .log-edit-btn:active { background: #e5e5ea; }
@@ -195,6 +196,12 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 .setting-desc { font-size: 12px; color: #8e8e93; margin-top: 3px; line-height: 1.35; max-width: 230px; }
 .setting-value { font-size: 15px; color: #8e8e93; }
 .section-header { font-size: 13px; color: #8e8e93; padding: 16px 16px 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.toggle-switch { position: relative; display: inline-block; width: 52px; height: 30px; flex-shrink: 0; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-switch span { position: absolute; cursor: pointer; inset: 0; background: #c7c7cc; border-radius: 999px; transition: .18s; }
+.toggle-switch span:before { position: absolute; content: ''; height: 26px; width: 26px; left: 2px; bottom: 2px; background: #fff; border-radius: 50%; transition: .18s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.toggle-switch input:checked + span { background: #1D9E75; }
+.toggle-switch input:checked + span:before { transform: translateX(22px); }
 .empty { padding: 32px 16px; text-align: center; font-size: 15px; color: #c7c7cc; }
 .month-nav { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:16px 16px 0; }
 .month-nav-btn { width:44px; height:36px; border:none; border-radius:10px; background:#fff; color:#1D9E75; font-size:24px; line-height:1; cursor:pointer; transition:transform .08s ease, filter .08s ease, opacity .08s ease; }
@@ -293,6 +300,10 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
             <button type="button" onclick="applyLiveEndTime()">反映</button>
           </div>
         </div>
+        <div style="padding:16px 16px 4px;display:none" id="visit-count-section">
+          <div class="deduct-title">訪問件数（任意）</div>
+          <div class="input-row"><label>件数</label><input type="number" id="confirm-visit-count" min="0" step="1" inputmode="numeric" placeholder="0"></div>
+        </div>
         <div style="padding:16px 16px 4px">
           <div class="deduct-title">中断時間を差し引く（任意）</div>
           <div id="deduct-list"></div>
@@ -328,6 +339,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
         <div class="edit-row"><label>開始</label><input type="time" id="edit-start"></div>
         <div class="edit-row"><label>終了</label><input type="time" id="edit-end"></div>
         <div class="edit-row"><label>中断</label><input type="number" id="edit-deduct" min="0" step="1" inputmode="numeric"><span class="setting-unit">分</span></div>
+        <div class="edit-row" id="edit-visit-count-row" style="display:none"><label>件数</label><input type="number" id="edit-visit-count" min="0" step="1" inputmode="numeric"></div>
         <div class="edit-actions">
           <button class="btn-primary btn-green" onclick="saveEditSession()">保存</button>
           <button class="btn-primary btn-gray" onclick="cancelEditSession()">キャンセル</button>
@@ -386,6 +398,13 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
   <div id="view-settings" style="display:none">
     <div class="header"><div class="header-title">設定</div></div>
     <div style="margin:16px">
+      <div class="section-header">表示設定</div>
+      <div class="card">
+        <div class="setting-row">
+          <div><div class="setting-label">訪問件数の入力</div><div class="setting-desc">奉仕記録に、時間とは別に訪問した件数を入力する欄を表示します。</div></div>
+          <label class="toggle-switch"><input type="checkbox" id="visit-count-enabled-input" onchange="onVisitCountToggle(this.checked)"><span></span></label>
+        </div>
+      </div>
       <div class="section-header">月次目標</div>
       <div class="card">
         <div class="setting-row">
@@ -454,7 +473,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 <div class="notice-overlay" id="report-notice-overlay"><div class="notice-card"><div class="notice-title">📌 奉仕報告の確認</div><div class="notice-msg">先月分の奉仕報告がまだ完了していません。<br><br>集計画面で内容を確認し、<br>レッスン件数を入力してください。</div><div class="notice-actions"><button class="btn-primary btn-green" onclick="openPendingReport()">集計を開く</button><button class="btn-primary btn-gray" onclick="snoozeReportNotice()">あとで</button></div></div></div>
 <div class="goal-overlay" id="goal-overlay" onclick="hideGoalBanner()"><div class="goal-card"><div class="goal-title">🎉目標達成！</div><div class="goal-msg">よく頑張りました！<br>あなたは忠実な良い奴隷です。</div></div></div>
 
-<script src="js/app.js?v=20260809-1"></script>
+<script src="js/app.js?v=20260823-visitcount1"></script>
 <script>
 (function(){
   var MIN_STARTUP_DISPLAY_MS = 1300;
