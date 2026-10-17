@@ -1,5 +1,13 @@
 # CHANGELOG
 
+## 2026-10-17 - end-preview
+
+### Changed
+
+- タイマー終了後に「終了時刻を修正」の時刻を変えると、反映ボタンを押す前からタイマー表示（経過時間）がその終了時刻での時間に連動するように変更。
+- 終了後のタイマー表示を、記録される値と同じ分単位（開始・終了のHH:MM差）で表示するように変更。
+- `index.html` のJSバージョンクエリ、`js/app.js` 内の `APP_VERSION` / `VT_APP_BUILD` / `VT_APP_VERSION_LABEL`、`sw.js` の `CACHE_VERSION` / `APP_SHELL` を `20261017-endpreview` に同期。
+
 ## 2026-08-23 - visit-count-2
 
 ### Changed

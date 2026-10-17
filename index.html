@@ -296,7 +296,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
         <div class="live-end-edit" id="live-end-edit">
           <div class="live-end-label">終了時刻を修正</div>
           <div class="live-end-row">
-            <input type="time" id="live-end-time">
+            <input type="time" id="live-end-time" oninput="previewLiveEndTime()">
             <button type="button" onclick="applyLiveEndTime()">反映</button>
           </div>
         </div>
@@ -473,7 +473,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 <div class="notice-overlay" id="report-notice-overlay"><div class="notice-card"><div class="notice-title">📌 奉仕報告の確認</div><div class="notice-msg">先月分の奉仕報告がまだ完了していません。<br><br>集計画面で内容を確認し、<br>レッスン件数を入力してください。</div><div class="notice-actions"><button class="btn-primary btn-green" onclick="openPendingReport()">集計を開く</button><button class="btn-primary btn-gray" onclick="snoozeReportNotice()">あとで</button></div></div></div>
 <div class="goal-overlay" id="goal-overlay" onclick="hideGoalBanner()"><div class="goal-card"><div class="goal-title">🎉目標達成！</div><div class="goal-msg">よく頑張りました！<br>あなたは忠実な良い奴隷です。</div></div></div>
 
-<script src="js/app.js?v=20260823-visitcount2"></script>
+<script src="js/app.js?v=20261017-endpreview"></script>
 <script>
 (function(){
   var MIN_STARTUP_DISPLAY_MS = 1300;

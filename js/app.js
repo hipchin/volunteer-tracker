@@ -1,6 +1,6 @@
 // ==== storage.js ====
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.08.23.visit-count-2';
+const APP_VERSION = '2026.10.17.end-preview';
 const BACKUP_SCHEMA_VERSION = 2;
 const SESSION_NORMALIZED_VERSION = 2;
 const VISIT_COUNT_ENABLED_KEY = 'vt_visit_count_enabled';
@@ -310,6 +310,25 @@ function updateTimerDisplay() {
     String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
 }
 
+function showFinishedDuration(end) {
+  if (!state.startTime || !end) return;
+  const startMin = state.startTime.getHours() * 60 + state.startTime.getMinutes();
+  const endMin = end.getHours() * 60 + end.getMinutes();
+  const mins = Math.max(0, endMin - startMin);
+  document.getElementById('timer-display').textContent =
+    String(Math.floor(mins / 60)).padStart(2, '0') + ':' + String(mins % 60).padStart(2, '0') + ':00';
+}
+
+function previewLiveEndTime() {
+  if (state.running || !state.startTime || !state.endTime) return;
+  const input = document.getElementById('live-end-time');
+  const mins = parseHM(input ? input.value : '');
+  if (mins === null) { showFinishedDuration(state.endTime); return; }
+  const newEnd = new Date(state.endTime);
+  newEnd.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+  showFinishedDuration(newEnd > state.startTime ? newEnd : state.endTime);
+}
+
 function resetTimerInputUI() {
   clearActiveTimer();
   state.running = false;
@@ -609,6 +628,7 @@ function toggleTimer() {
     const liveEdit = document.getElementById('live-start-edit');
     if (liveEdit) liveEdit.classList.remove('show');
     document.getElementById('timer-label').textContent = fmtTime(state.startTime) + ' 〜 ' + fmtTime(state.endTime);
+    showFinishedDuration(state.endTime);
     deductRows = [];
     document.getElementById('deduct-card').style.display = 'block';
     updateLiveEndEditVisibility();
@@ -677,6 +697,7 @@ function applyLiveEndTime() {
   if (newEnd <= state.startTime) { showToast('終了時刻は開始より後にしてください'); return; }
   state.endTime = newEnd;
   document.getElementById('timer-label').textContent = fmtTime(state.startTime) + ' 〜 ' + fmtTime(state.endTime);
+  showFinishedDuration(state.endTime);
   updateLiveEndEditVisibility();
   showToast('終了時刻を修正しました');
 }
@@ -1173,8 +1194,8 @@ Object.assign(window, {
 
 // ==== app-version.js ====
 // 次回以降の更新では、まずこの2つだけを変更する。
-window.VT_APP_BUILD = '20260823-visitcount2';
-window.VT_APP_VERSION_LABEL = '2026.08.23.visit-count-2';
+window.VT_APP_BUILD = '20261017-endpreview';
+window.VT_APP_VERSION_LABEL = '2026.10.17.end-preview';
 
 // ==== carryover-update.js ====
 // volunteer-tracker carryover + robust update patch
