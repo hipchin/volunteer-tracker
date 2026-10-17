@@ -1,6 +1,6 @@
 // ==== storage.js ====
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.08.23.visit-count-2';
+const APP_VERSION = '2026.10.17.end-preview-2';
 const BACKUP_SCHEMA_VERSION = 2;
 const SESSION_NORMALIZED_VERSION = 2;
 const VISIT_COUNT_ENABLED_KEY = 'vt_visit_count_enabled';
@@ -310,6 +310,54 @@ function updateTimerDisplay() {
     String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
 }
 
+function showFinishedDuration(end) {
+  if (!state.startTime || !end) return;
+  const startMin = state.startTime.getHours() * 60 + state.startTime.getMinutes();
+  const endMin = end.getHours() * 60 + end.getMinutes();
+  const mins = Math.max(0, endMin - startMin);
+  document.getElementById('timer-display').textContent =
+    String(Math.floor(mins / 60)).padStart(2, '0') + ':' + String(mins % 60).padStart(2, '0') + ':00';
+}
+
+function pendingEndTime() {
+  const endEdit = document.getElementById('live-end-edit');
+  const input = document.getElementById('live-end-time');
+  if (!endEdit || !input || !endEdit.classList.contains('show')) return state.endTime;
+  const mins = parseHM(input.value);
+  if (mins === null || input.value === fmtTime(state.endTime)) return state.endTime;
+  const newEnd = new Date(state.endTime);
+  newEnd.setHours(Math.floor(mins / 60), mins % 60, 0, 0);
+  return newEnd > state.startTime ? newEnd : state.endTime;
+}
+
+function calcSessionMinutes(end) {
+  const startMin = state.startTime.getHours() * 60 + state.startTime.getMinutes();
+  const endMin = end.getHours() * 60 + end.getMinutes();
+  let deductMin = 0;
+  for (const row of deductRows) {
+    const from = parseHM(row.from);
+    const to = parseHM(row.to);
+    if (from !== null && to !== null && to > from) deductMin += to - from;
+  }
+  return { netMin: Math.max(0, endMin - startMin - deductMin), deductMin };
+}
+
+function updatePlannedTime() {
+  const el = document.getElementById('planned-time');
+  if (!el) return;
+  if (state.running || !state.startTime || !state.endTime) { el.textContent = ''; return; }
+  const end = pendingEndTime();
+  showFinishedDuration(end);
+  const { netMin, deductMin } = calcSessionMinutes(end);
+  el.textContent = '記録予定: ' + fmtHours(netMin / 60) +
+    (deductMin ? '（中断 ' + fmtHours(deductMin / 60) + ' を差引）' : '') +
+    (end !== state.endTime ? ' ※終了時刻は未反映' : '');
+}
+
+function previewLiveEndTime() {
+  updatePlannedTime();
+}
+
 function resetTimerInputUI() {
   clearActiveTimer();
   state.running = false;
@@ -338,12 +386,13 @@ function renderDeductList() {
   deductRows.forEach((row, i) => {
     const div = document.createElement('div');
     div.className = 'deduct-row';
-    div.innerHTML = '<input type="time" value="' + (row.from || '') + '" onchange="deductRows[' + i + '].from=this.value">' +
+    div.innerHTML = '<input type="time" value="' + (row.from || '') + '" oninput="deductRows[' + i + '].from=this.value;updatePlannedTime()" onchange="deductRows[' + i + '].from=this.value;updatePlannedTime()">' +
       '<span class="deduct-sep">〜</span>' +
-      '<input type="time" value="' + (row.to || '') + '" onchange="deductRows[' + i + '].to=this.value">' +
+      '<input type="time" value="' + (row.to || '') + '" oninput="deductRows[' + i + '].to=this.value;updatePlannedTime()" onchange="deductRows[' + i + '].to=this.value;updatePlannedTime()">' +
       '<button class="deduct-del" onclick="removeDeduct(' + i + ')">×</button>';
     container.appendChild(div);
   });
+  updatePlannedTime();
 }
 
 function renderLog() {
@@ -678,6 +727,7 @@ function applyLiveEndTime() {
   state.endTime = newEnd;
   document.getElementById('timer-label').textContent = fmtTime(state.startTime) + ' 〜 ' + fmtTime(state.endTime);
   updateLiveEndEditVisibility();
+  updatePlannedTime();
   showToast('終了時刻を修正しました');
 }
 
@@ -713,16 +763,8 @@ function removeDeduct(i) { deductRows.splice(i, 1); renderDeductList(); }
 function confirmSession() {
   if (!state.startTime || !state.endTime || !state.manualDate) { showToast('記録する時間が見つかりません'); return; }
   if (!isSameLocalDate(state.startTime, state.endTime)) { showToast('日付をまたいだ記録は手動入力してください'); return; }
-  const startMin = state.startTime.getHours() * 60 + state.startTime.getMinutes();
-  const endMin = state.endTime.getHours() * 60 + state.endTime.getMinutes();
-  let netMin = endMin - startMin;
-  let deductMin = 0;
-  for (const row of deductRows) {
-    const from = parseHM(row.from);
-    const to = parseHM(row.to);
-    if (from !== null && to !== null && to > from) deductMin += to - from;
-  }
-  netMin = Math.max(0, netMin - deductMin);
+  if (pendingEndTime() !== state.endTime) { showToast('終了時刻の「反映」を押してから確定してください'); return; }
+  const { netMin, deductMin } = calcSessionMinutes(state.endTime);
   const dateStr = state.manualDate;
   const visitCountInput = document.getElementById('confirm-visit-count');
   const visitCountRaw = visitCountInput ? visitCountInput.value.trim() : '';
@@ -1173,8 +1215,8 @@ Object.assign(window, {
 
 // ==== app-version.js ====
 // 次回以降の更新では、まずこの2つだけを変更する。
-window.VT_APP_BUILD = '20260823-visitcount2';
-window.VT_APP_VERSION_LABEL = '2026.08.23.visit-count-2';
+window.VT_APP_BUILD = '20261017-endpreview2';
+window.VT_APP_VERSION_LABEL = '2026.10.17.end-preview-2';
 
 // ==== carryover-update.js ====
 // volunteer-tracker carryover + robust update patch

@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## 2026-10-17 - end-preview-2
+
+### Added
+
+- 「記録を確定する」ボタンの上に「記録予定: ○時間○分（中断 ○分を差引）」を表示。終了時刻の入力・中断時間の入力に合わせて即時更新され、確定前に記録される時間が分かる。
+
+### Changed
+
+- 終了時刻を入力したまま「反映」を押さずに確定しようとした場合、未反映のまま記録されないようトーストで案内して確定を止めるように変更（記録予定には「※終了時刻は未反映」と表示）。
+- 実働時間の計算を `calcSessionMinutes()` に共通化し、確定時と記録予定表示で同じ計算を使うように変更。
+- `index.html` のJSバージョンクエリ、`js/app.js` 内の `APP_VERSION` / `VT_APP_BUILD` / `VT_APP_VERSION_LABEL`、`sw.js` の `CACHE_VERSION` / `APP_SHELL` を `20261017-endpreview2` に同期。
+
+## 2026-10-17 - end-preview
+
+### Changed
+
+- タイマー終了後に「終了時刻を修正」の時刻を変えると、反映ボタンを押す前からタイマー表示（経過時間）がその終了時刻での時間に連動するように変更。
+- 終了後のタイマー表示を、記録される値と同じ分単位（開始・終了のHH:MM差）で表示するように変更。
+- `index.html` のJSバージョンクエリ、`js/app.js` 内の `APP_VERSION` / `VT_APP_BUILD` / `VT_APP_VERSION_LABEL`、`sw.js` の `CACHE_VERSION` / `APP_SHELL` を `20261017-endpreview` に同期。
+
 ## 2026-08-23 - visit-count-2
 
 ### Changed

@@ -135,6 +135,8 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 .deduct-row input { flex: 1; font-size: 15px; padding: 8px 10px; border: 0.5px solid #c6c6c8; border-radius: 10px; background: #fff; color: #1c1c1e; -webkit-appearance: none; }
 .deduct-row input:focus { outline: none; border-color: #1D9E75; }
 .deduct-sep { font-size: 13px; color: #c7c7cc; }
+.planned-time { padding: 4px 16px 12px; font-size: 15px; font-weight: 600; color: #1D9E75; }
+.planned-time:empty { display: none; }
 .deduct-del { width: 28px; height: 28px; border-radius: 50%; background: #ff3b30; border: none; color: #fff; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform 0.08s ease, filter 0.08s ease, opacity 0.08s ease; }
 .btn-add-deduct { background: none; border: none; font-size: 15px; color: #1D9E75; cursor: pointer; padding: 6px 0 12px; display: block; transition: transform 0.08s ease, opacity 0.08s ease; }
 .log-item { padding: 12px 16px; border-bottom: 0.5px solid #f2f2f7; display: flex; align-items: center; justify-content: space-between; }
@@ -296,7 +298,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
         <div class="live-end-edit" id="live-end-edit">
           <div class="live-end-label">終了時刻を修正</div>
           <div class="live-end-row">
-            <input type="time" id="live-end-time">
+            <input type="time" id="live-end-time" oninput="previewLiveEndTime()">
             <button type="button" onclick="applyLiveEndTime()">反映</button>
           </div>
         </div>
@@ -309,6 +311,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
           <div id="deduct-list"></div>
           <button class="btn-add-deduct" onclick="addDeductRow()">＋ 中断時間を追加</button>
         </div>
+        <div class="planned-time" id="planned-time"></div>
         <div style="padding:0 16px 16px">
           <button class="btn-primary btn-gray" onclick="confirmSession()">記録を確定する</button>
         </div>
@@ -473,7 +476,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 <div class="notice-overlay" id="report-notice-overlay"><div class="notice-card"><div class="notice-title">📌 奉仕報告の確認</div><div class="notice-msg">先月分の奉仕報告がまだ完了していません。<br><br>集計画面で内容を確認し、<br>レッスン件数を入力してください。</div><div class="notice-actions"><button class="btn-primary btn-green" onclick="openPendingReport()">集計を開く</button><button class="btn-primary btn-gray" onclick="snoozeReportNotice()">あとで</button></div></div></div>
 <div class="goal-overlay" id="goal-overlay" onclick="hideGoalBanner()"><div class="goal-card"><div class="goal-title">🎉目標達成！</div><div class="goal-msg">よく頑張りました！<br>あなたは忠実な良い奴隷です。</div></div></div>
 
-<script src="js/app.js?v=20260823-visitcount2"></script>
+<script src="js/app.js?v=20261017-endpreview2"></script>
 <script>
 (function(){
   var MIN_STARTUP_DISPLAY_MS = 1300;
