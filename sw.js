@@ -1,12 +1,12 @@
 // volunteer-tracker Service Worker — fast app-shell startup
 // Static app files are served from the device cache. A fresh index.html is
 // fetched in the background and becomes visible on the next launch.
-const CACHE_VERSION = 'volunteer-tracker-shell-20261017-endpreview';
+const CACHE_VERSION = 'volunteer-tracker-shell-20261017-endpreview2';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.json',
-  './js/app.js?v=20261017-endpreview',
+  './js/app.js?v=20261017-endpreview2',
   './apple-touch-icon-v2.png'
 ];
 
