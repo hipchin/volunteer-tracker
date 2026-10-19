@@ -470,6 +470,7 @@ Service Workerの `CACHE_VERSION` も、キャッシュ挙動を変える場合�
 - タップ時の押下フィードバック
 - 目標達成時のオーバーレイ
 - 未報告通知オーバーレイ
+- 画面切り替え・月送り・カード表示・記録確定時の控えめな動き（`vtEnter()` / `vtPulse()`。`prefers-reduced-motion` では動かさない）
 
 ---
 
