@@ -240,6 +240,22 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 .update-banner button{border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
 .update-banner .update-apply{background:#1D9E75;color:#fff}
 .update-banner .update-dismiss{background:rgba(255,255,255,.15);color:#fff}
+/* ---- 動き: 状態の変化と操作の結果を、短く小さな動きで伝える ---- */
+:root { --vt-dur-fast: .16s; --vt-dur: .24s; --vt-ease: cubic-bezier(.2,0,0,1); --vt-ease-enter: cubic-bezier(0,0,.2,1); }
+.timer-display { transition: color var(--vt-dur) var(--vt-ease); }
+.tab svg { transition: transform var(--vt-dur-fast) var(--vt-ease); }
+.tab.active svg { transform: translateY(-1px); }
+.toast { transform: translateX(-50%) translateY(8px); transition: opacity var(--vt-dur) var(--vt-ease), transform var(--vt-dur) var(--vt-ease); }
+.toast.show { transform: translateX(-50%) translateY(0); }
+.live-start-edit.show, .live-end-edit.show { animation: vt-reveal var(--vt-dur) var(--vt-ease-enter); }
+.log-item.editing { transition: background-color var(--vt-dur) var(--vt-ease); }
+@keyframes vt-reveal { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes vt-pulse { 0% { transform: scale(1); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } }
+.vt-pulse { display: inline-block; animation: vt-pulse .36s var(--vt-ease); }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+  .toast, .toast.show { transform: translateX(-50%); }
+}
 </style>
 <div class="app">
   <div id="view-record">
@@ -476,7 +492,7 @@ button, .tab { -webkit-user-select: none; user-select: none; touch-action: manip
 <div class="notice-overlay" id="report-notice-overlay"><div class="notice-card"><div class="notice-title">📌 奉仕報告の確認</div><div class="notice-msg">先月分の奉仕報告がまだ完了していません。<br><br>集計画面で内容を確認し、<br>レッスン件数を入力してください。</div><div class="notice-actions"><button class="btn-primary btn-green" onclick="openPendingReport()">集計を開く</button><button class="btn-primary btn-gray" onclick="snoozeReportNotice()">あとで</button></div></div></div>
 <div class="goal-overlay" id="goal-overlay" onclick="hideGoalBanner()"><div class="goal-card"><div class="goal-title">🎉目標達成！</div><div class="goal-msg">よく頑張りました！<br>あなたは忠実な良い奴隷です。</div></div></div>
 
-<script src="js/app.js?v=20261017-endpreview2"></script>
+<script src="js/app.js?v=20261019-motion1"></script>
 <script>
 (function(){
   var MIN_STARTUP_DISPLAY_MS = 1300;

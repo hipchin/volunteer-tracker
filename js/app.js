@@ -1,6 +1,6 @@
 // ==== storage.js ====
 const CAT_LABEL = { main: '野外奉仕', other: 'その他の奉仕' };
-const APP_VERSION = '2026.10.17.end-preview-2';
+const APP_VERSION = '2026.10.19.motion-1';
 const BACKUP_SCHEMA_VERSION = 2;
 const SESSION_NORMALIZED_VERSION = 2;
 const VISIT_COUNT_ENABLED_KEY = 'vt_visit_count_enabled';
@@ -229,6 +229,30 @@ function fmtGoalHours(h) {
 }
 
 // ==== ui.js ====
+// ---- 動き ----
+// 現れた部分だけを短く動かす。端末で「視差効果を減らす」設定なら動かさない
+const vtReduceMotion = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+function vtMotionOk() {
+  return !(vtReduceMotion && vtReduceMotion.matches) && typeof Element !== 'undefined' && typeof Element.prototype.animate === 'function';
+}
+// dx / dy: 入ってくる方向(px)。0 なら薄く出すだけ
+function vtEnter(el, dx = 0, dy = 6, duration = 240) {
+  if (!el || !vtMotionOk()) return;
+  el.getAnimations().forEach(a => a.cancel());
+  el.animate([
+    { opacity: 0, transform: 'translate(' + dx + 'px,' + dy + 'px)' },
+    { opacity: 1, transform: 'none' }
+  ], { duration, easing: 'cubic-bezier(0,0,.2,1)' });
+}
+// 記録や保存の結果として数値が変わったときに、数値を一度だけ小さく弾ませる
+function vtPulse(el) {
+  if (!el || !vtMotionOk()) return;
+  el.classList.remove('vt-pulse');
+  void el.offsetWidth;
+  el.classList.add('vt-pulse');
+  el.addEventListener('animationend', () => el.classList.remove('vt-pulse'), { once: true });
+}
+
 function showToast(msg) {
   const toast = document.getElementById('toast');
   if (!toast) return;
@@ -468,6 +492,7 @@ function renderSummary() {
 }
 
 function showTab(tab) {
+  const prevView = ['record', 'log', 'summary', 'settings'].find(t => document.getElementById('view-' + t).style.display !== 'none');
   ['record', 'log', 'summary', 'settings'].forEach(t => {
     document.getElementById('view-' + t).style.display = t === tab ? 'block' : 'none';
     document.getElementById('tab-' + t).classList.toggle('active', t === tab);
@@ -483,6 +508,7 @@ function showTab(tab) {
     if (visitCountEnabledInput) visitCountEnabledInput.checked = visitCountEnabled();
     updateAppInfo();
   }
+  if (prevView && prevView !== tab) vtEnter(document.getElementById('view-' + tab), 0, 6, 200);
 }
 
 function applyVisitCountVisibility() {
@@ -612,6 +638,7 @@ function showManual() {
   document.getElementById('manual-date').value = todayStr();
   document.getElementById('timer-section').style.display = 'none';
   document.getElementById('manual-section').style.display = 'block';
+  vtEnter(document.getElementById('manual-section'));
   document.getElementById('deduct-card').style.display = 'none';
   const endEdit = document.getElementById('live-end-edit');
   if (endEdit) endEdit.classList.remove('show');
@@ -619,6 +646,7 @@ function showManual() {
 function hideManual() {
   document.getElementById('manual-section').style.display = 'none';
   document.getElementById('timer-section').style.display = 'block';
+  vtEnter(document.getElementById('timer-section'));
 }
 
 function toggleTimer() {
@@ -660,6 +688,7 @@ function toggleTimer() {
     document.getElementById('timer-label').textContent = fmtTime(state.startTime) + ' 〜 ' + fmtTime(state.endTime);
     deductRows = [];
     document.getElementById('deduct-card').style.display = 'block';
+    vtEnter(document.getElementById('deduct-card'), 0, 12);
     updateLiveEndEditVisibility();
     renderDeductList();
   }
@@ -753,11 +782,16 @@ function submitManual() {
   document.getElementById('timer-display').textContent = '00:00:00';
   document.getElementById('start-btn').style.display = 'none';
   document.getElementById('deduct-card').style.display = 'block';
+  vtEnter(document.getElementById('deduct-card'), 0, 12);
   updateLiveEndEditVisibility();
   renderDeductList();
 }
 
-function addDeductRow() { deductRows.push({ from: '', to: '' }); renderDeductList(); }
+function addDeductRow() {
+  deductRows.push({ from: '', to: '' });
+  renderDeductList();
+  vtEnter(document.getElementById('deduct-list').lastElementChild, 0, -4, 200);
+}
 function removeDeduct(i) { deductRows.splice(i, 1); renderDeductList(); }
 
 function confirmSession() {
@@ -793,6 +827,7 @@ function confirmSession() {
   document.getElementById('manual-end').value = '';
   if (visitCountInput) visitCountInput.value = '';
   updateProgress();
+  vtPulse(document.getElementById('total-display'));
   showToast(fmtHours(session.hours) + ' を記録しました');
   checkGoalAchievement();
 }
@@ -817,6 +852,7 @@ function startEditSession(id) {
   }
   document.getElementById('edit-sub').textContent = session.date + ' ' + session.start + ' 〜 ' + session.end;
   document.getElementById('edit-card').style.display = 'block';
+  vtEnter(document.getElementById('edit-card'), 0, 12);
   renderLog();
   document.getElementById('edit-card').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -1007,6 +1043,12 @@ function changeSelectedMonth(delta) {
   cancelEditSession();
   renderLog();
   renderSummary();
+  // 次の月は右から、前の月は左から入れ替わる
+  const dx = delta > 0 ? 16 : -16;
+  const logList = document.getElementById('log-list');
+  const summaryBody = document.getElementById('sum-total')?.closest('.card')?.parentElement;
+  if (document.getElementById('view-log').style.display !== 'none') vtEnter(logList, dx, 0, 200);
+  if (document.getElementById('view-summary').style.display !== 'none') vtEnter(summaryBody, dx, 0, 200);
 }
 function saveLessonCount() {
   const input = document.getElementById('lesson-input');
@@ -1215,8 +1257,8 @@ Object.assign(window, {
 
 // ==== app-version.js ====
 // 次回以降の更新では、まずこの2つだけを変更する。
-window.VT_APP_BUILD = '20261017-endpreview2';
-window.VT_APP_VERSION_LABEL = '2026.10.17.end-preview-2';
+window.VT_APP_BUILD = '20261019-motion1';
+window.VT_APP_VERSION_LABEL = '2026.10.19.motion-1';
 
 // ==== carryover-update.js ====
 // volunteer-tracker carryover + robust update patch
